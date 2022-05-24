@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Document name="isc.rest.ZPM">
+    <Module>
+      <Name>isc.rest</Name>
+      <Version>1.0.0+snapshot</Version>
+      <Packaging>module</Packaging>
+      <Dependencies>
+        <ModuleReference>
+          <Name>isc.json</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+      <Resources><Resource Name="pkg.isc.rest.lifecycle.CLS" Preload="true" />
+        <Resource Name="%pkg.isc.rest.PKG"></Resource>
+        <Resource Name="%pkg.isc.rest.openAPI.INC"></Resource>
+        <Resource Name="%pkg.isc.rest.general.INC"></Resource>
+        <Resource Name="/internal/testing/unit_tests/">
+          <Attribute Name="Package">UnitTest.isc.rest</Attribute>
+        </Resource>
+      </Resources>
+      <LifecycleClass>pkg.isc.rest.lifecycle</LifecycleClass>
+      <Defaults>
+        <ProcessorDefault Class="Default.Include">
+          <Attribute Name="Format">UDL</Attribute>
+        </ProcessorDefault>
+        <ProcessorDefault Class="Default.Class">
+          <Attribute Name="FilenameExtension">cls</Attribute>
+          <Attribute Name="Format">UDL</Attribute>
+        </ProcessorDefault>
+        <ProcessorDefault Class="Default.Package">
+          <Attribute Name="FilenameExtension">cls</Attribute>
+          <Attribute Name="Format">UDL</Attribute>
+        </ProcessorDefault>
+        <ProcessorDefault Class="UnitTest">
+          <Attribute Name="Format">UDL</Attribute>
+        </ProcessorDefault>
+      </Defaults>
+    </Module>
+  
+
+</Document></Export>
