@@ -3,7 +3,7 @@ Class isc.sample.rest.phonebook.rest.model.PhoneNumber Extends %pkg.isc.rest.mod
 
 Parameter RESOURCENAME = "phone-number";
 
-Parameter SOURCECLASS = "Sample.Phonebook.Model.PhoneNumber";
+Parameter SOURCECLASS = "isc.sample.rest.phonebook.model.PhoneNumber";
 
 Parameter JSONMAPPING = "PhoneNumberWithPerson";
 
