@@ -237,10 +237,9 @@ TODO: Talk about Supports()
 Only the following classes should directly be used by consuming applications i.e.
 extending the classes/creating instances of classes/invoking methods or queries 
 on the classes:
-- `%pkg.isc.rest.adaptor`
+- `%pkg.isc.rest.handler`
 - `%pkg.isc.rest.authentication`
 - `%pkg.isc.rest.authentication.*`
-- `%pkg.isc.rest.authentication`
 - `%pkg.isc.rest.model.resource`
 - `%pkg.isc.rest.model.iSerializable`
 - `%pkg.isc.rest.model.proxy`

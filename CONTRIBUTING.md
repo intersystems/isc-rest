@@ -16,10 +16,9 @@ Generally speaking, just try to match the conventions you see in the code you ar
 * One command per line
 * Do not use dot syntax
 * Indentation with tabs
-* Pascal case class and method names
+* camelCase class names
+* PascalCase method names
 * Avoid using postconditionals
-* Local variables start with `t`; formal parameter names start with `p`
+* Formal parameter names start with `p`
 * Always check %Status return values
-
-Thanks,
-Tim Leavitt, InterSystems Corporation
+* Generally, throw and catch exceptions rather than using %Status
