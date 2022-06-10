@@ -48,11 +48,14 @@ Property ReturnSchema As %pkg.isc.rest.openAPI.model.schema [ Internal, Transien
 /// Description of this action
 Property Description As %String [ Internal ];
 
-/// Whether or not this endpoint is forbidden
+/// Whether this endpoint is forbidden
 Property Forbidden As %Boolean [ Internal ];
 
 /// Whether or not this endpoint is *always* forbidden
 Property ForbidUnderAllCircumstances As %Boolean [ InitialExpression = 0, Internal ];
+
+/// Whether this endpoint is supported
+Property Supported As %Boolean [ Internal ];
 
 /// The JSONMappng to use for the model class
 Property Mapping As %String [ Internal ];
@@ -67,6 +70,7 @@ ClassMethod FromQueryValues(result As %SQL.StatementResult, openapi As %pkg.isc.
 {
 	
 	// TODO: Comment!
+	#dim actionInfo As %pkg.isc.rest.openAPI.actionInfo
 	Set actionInfo = ..%New()
 	Set actionInfo.SourceClass = $Parameter($$$CLASSNAME(result.ImplementationClass), "SOURCECLASS")
 	Set actionInfo.InstanceHandler = $$$CLASSNAME(##class(%Dictionary.CompiledMethod).%OpenId($$$CLASSNAME(result.ImplementationClass) _ "||HandleInvokeInstanceAction").Origin)
@@ -181,9 +185,13 @@ ClassMethod FromQueryValues(result As %SQL.StatementResult, openapi As %pkg.isc.
 				Set argument = actionInfo.Arguments.GetNext(.key)
 			}
 		}
+		Set actionInfo.Supported = $Case(actionInfo.Target,
+			"class": ##class(%pkg.isc.rest.handler).CheckSupportsDispatchClassAction(result.ResourceClass,result.ActionName),
+			"instance": ##class(%pkg.isc.rest.handler).CheckSupportsDispatchInstanceAction(result.ResourceClass,result.ActionName), 
+			: 0) // Should always be one out of class/instance so shouldn't reach here
 		Try {
 			Try {
-				Set actionInfo.Forbidden = '$ClassMethod($$$CLASSNAME(result.ResourceClass), "CheckPermission", "", "ACTION:" _ action.name, openapi.UserContext)
+				Set actionInfo.Forbidden = '$ClassMethod($$$CLASSNAME(result.ResourceClass), "CheckPermission", "", $$$OperationAction(action.name), openapi.UserContext)
 			} Catch {
 				Set actionInfo.Forbidden = 1
 			}

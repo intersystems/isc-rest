@@ -1,6 +1,7 @@
 /// Tests for <class>%pkg.isc.rest.handler</class> by emulating the requests
 /// to the dispatch class.
-Class UnitTest.isc.rest.driveSample Extends UnitTest.isc.rest.testCase [ DependsOn = (UnitTest.isc.rest.sample.handler, UnitTest.isc.rest.sample.userContext) ]
+/// zpm "isc.rest test -only -DUnitTest.Case=UnitTest.isc.rest.handler"
+Class UnitTest.isc.rest.handler Extends UnitTest.isc.rest.testCase [ DependsOn = (UnitTest.isc.rest.sample.handler, UnitTest.isc.rest.sample.userContext) ]
 {
 
 /// Subclasses must override this parameter to define the application's REST handler class that is to be tested.
@@ -191,7 +192,7 @@ Method TestPerson10TestPathParameter()
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
     Set request.URL = "http://test/"_route
-    Do ..Request("POST", route, .request, .response, .object, .raw)
+    Do ..Request("POST", route, .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
     Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
     Do $$$AssertEquals(object.first, 1)
@@ -285,7 +286,7 @@ Method TestBad01InvalidOrderBy()
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
     Set request.Data("$orderBy", 1) = "-SSN"
-    Do ..Request("GET", "person", .request, .response, .object, .raw)
+    Do ..Request("GET", "person", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
     Do $$$AssertEquals(object.errors.%Get(0).params.%Get(0), "Invalid query. Column 'SSN' does not exist.")
 }
@@ -321,12 +322,12 @@ Method TestBad03NoResource()
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("PUT", "vehicle/1", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("POST", "vehicle", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
@@ -411,6 +412,114 @@ Method TestBad08NonJSONTypes()
     Set request.ContentType = "application/xml"
     Do ..Request("PUT", "person/1/$update-home-address", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+}
+
+/// Confirm that the /auth endpoints are not accessible but the
+/// /build-documentation and /openapi.json endpoints are supported
+Method TestSupportsHandlerEndpoints()
+{
+    Do ..mockStatic("%pkg.isc.rest.handler", ..#CALLSREALMETHODS)
+
+    #dim request As %CSP.Request
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..Request("GET", "auth/status", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK,"auth/status supported")
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..Request("POST", "auth/logout", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND,"auth/logout not supported")
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..when(##class(%pkg.isc.rest.handler).BuildDocumentationEndpoint()).thenReturn($$$OK)
+    Do ..Request("POST", "build-documentation", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK,"build-documentation supported")
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..when(##class(%pkg.isc.rest.handler).GetDocumentationBuildStatus()).thenReturn($$$OK)
+    Do ..Request("GET", "build-documentation", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK,"build-documentation supported")
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..when(##class(%pkg.isc.rest.handler).GetOpenAPISpecification()).thenReturn($$$OK)
+    Do ..Request("GET", "openapi.json", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK,"openapi.json supported")
+}
+
+/// Test default code generation of SupportsDefault() for resource class
+Method TestSupportsResourceDefault()
+{
+    #dim request As %CSP.Request
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "empty", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do ..Request("POST", "empty", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "empty/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do ..Request("PUT", "empty/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do ..Request("DELETE", "empty/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "empty/$new", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+}
+
+/// Test overridden Supports method.
+Method TestSupportsResourceOverridden()
+{
+    #dim request As %CSP.Request
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "settings", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+
+    // Even though string isn't used, write to it to ensure %ToJSON doesn't write to current device
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set stream = ##class(%Stream.TmpCharacter).%New()
+    Set string = {"timeout": (300)}.%ToJSON(.stream)
+    Set request.Content = stream
+    Set request.ContentType = "application/json"
+    Do ..Request("POST", "settings", .request, .response, .object, .raw)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP201CREATED)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "settings/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do ..Request("PUT", "settings/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do ..Request("DELETE", "settings/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "settings/$new", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
 }
 
 }

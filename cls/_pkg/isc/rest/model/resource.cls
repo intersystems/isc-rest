@@ -1,3 +1,5 @@
+Include %pkg.isc.rest.general
+
 /// Base class for all REST resources
 Class %pkg.isc.rest.model.resource Extends (%RegisteredObject, %pkg.isc.rest.model.iSerializable) [ Abstract, System = 3 ]
 {
@@ -20,7 +22,7 @@ ClassMethod GetModelInstance(args...) As %pkg.isc.rest.model.resource [ Abstract
 {
 }
 
-/// Saves the model instance
+/// Saves the model instance.
 Method SaveModelInstance(pUserContext As %RegisteredObject) [ Abstract ]
 {
 }
@@ -38,17 +40,33 @@ ClassMethod GetCollection(ByRef params, selectMode As %Integer) [ Abstract ]
 }
 
 /// Checks the user's permission for a particular operation on a particular record.
-/// <var>pOperation</var> may be one of:
-/// CREATE
-/// READ
-/// UPDATE
-/// DELETE
-/// QUERY
-/// ACTION:<action name>
-/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>
+/// <var>pOperation</var> may be one of the macros of the form $$$Operation*
+/// present in %pkg.isc.rest.general.inc. <br />
+/// If this method returns 0, the corresponding dispatch class will return a 403
+/// Unauthorized status when the operation is invoked. <br />
+/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>. <br />
 ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
 {
-	Quit 0
+	Return 0
+}
+
+/// Checks if the particular operation is supported for this resource. <br />
+/// Look at documentation of <method>SupportsDefault</method> for default behavior
+/// of this method. <br />
+/// If the method returns 0, the corresponding dispatch class will return a 404
+/// Not Found status when the operation is invoked. <br />
+/// NOTE: This method runs on EVERY request so should be quick, lightweight checks
+/// to prevent performance bottlenecks. <br />
+/// <var>pOperation</var> may be one of the macros of the form $$$Operation*
+/// present in %pkg.isc.rest.general.inc. <br />
+/// <var>pType</var> is the type of the operation (instance-level on a particular
+/// record or class-level). <br />
+/// <var>pRequest</var> is the request object in an HTTP context.
+/// NOTE: MUST check that this is an object before using it as it may be passed
+/// as a NULL OREF in some cases. <br />
+ClassMethod Supports(pOperation As %String, pType As %String(VALUELIST=",instance,class"), pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
+{
+	Return ..SupportsDefault(pOperation, pType)
 }
 
 /// Defines a mapping of actions available for this model class to the associated methods and arguments.
@@ -73,6 +91,56 @@ Projection Actions As %pkg.isc.rest.model.action.projection;
 /// Note: Endpoints can be removed from the endpoints array as desired, however schemas should not be removed from the schemas array.
 ClassMethod ModifyOpenAPIInfo(ByRef schemas As %ListOfObjects, ByRef endpoints As %pkg.isc.rest.openAPI.model.paths) [ Abstract ]
 {
+}
+
+/// Default implementation of <method>Supports</method> which acts as a wrapper
+/// around this method. <br />
+/// By default, the behavior is to support all operations that have their 
+/// corresponding methods implemented i.e. the methods are not abstract. <br />
+ClassMethod SupportsDefault(pOperation As %String, pType As %String(VALUELIST=",instance,class"), pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean [ CodeMode = objectgenerator, Final, ForceGenerate ]
+{
+    // NOTE: Mapping of operation to corresponding method in a resource class
+    // is determined by looking at %pkg.isc.rest.handler.
+	#define Generate(%line) Do %code.WriteLine($Char(9)_%line)
+    #define MethodImplemented(%method) '$$$comMemberKeyGet(%class.Name,$$$cCLASSmethod,%method,$$$cMETHabstract)
+
+    If (%class.Abstract) {
+        // Skip for abstract classes
+        Return $$$OK
+    }
+
+    Set getCollectionImplemented = $$$MethodImplemented("GetCollection")
+    Set getModelInstanceImplemented = $$$MethodImplemented("GetModelInstance")
+    Set saveModelInstanceImplemented = $$$MethodImplemented("SaveModelInstance")
+    Set deleteModelInstanceImplemented = $$$MethodImplemented("DeleteModelInstance")
+
+	$$$Generate("If (pType = ""class"") {")
+    $$$Generate("   Return $Case(pOperation,")
+    // Corresponds to /:resource:GET.
+    $$$Generate("       $$$OperationQuery: " _ getCollectionImplemented _ ",")
+    // Corresponds to /:resource:POST.
+    $$$Generate("       $$$OperationCreate: " _ (getModelInstanceImplemented && saveModelInstanceImplemented) _ ",")
+    // Corresponds to /:resource/$new.
+    $$$Generate("       $$$OperationRead: " _ getModelInstanceImplemented _ ",")
+    $$$Generate("       $$$OperationActionNew: " _ getModelInstanceImplemented _ ",")
+    // Corresponds to actions. Default is to support all actions.
+    $$$Generate("       : 1")
+    $$$Generate("   )")
+	$$$Generate("} ElseIf (pType = ""instance"") {")
+    $$$Generate("   Return $Case(pOperation,")
+    // Corresponds to /:resource/:id:GET.
+    $$$Generate("       $$$OperationRead: " _ getModelInstanceImplemented _ ",")
+    // Corresponds to /:resource/:id:PUT.
+    $$$Generate("       $$$OperationUpdate: " _ (getModelInstanceImplemented && saveModelInstanceImplemented) _ ",")
+    // Corresponds to /:resource/:id:DELETE.
+    $$$Generate("       $$$OperationDelete: " _ deleteModelInstanceImplemented _ ",")
+    // Corresponds to actions. Default is to support all actions.
+    $$$Generate("       : 1")
+    $$$Generate("   )")
+	$$$Generate("} Else {")
+    $$$Generate("   $$$ThrowStatus($$$ERROR($$$GeneralError,""Unexpected Operation Type: ""_pType))")
+    $$$Generate("}")
+	Return $$$OK
 }
 
 }

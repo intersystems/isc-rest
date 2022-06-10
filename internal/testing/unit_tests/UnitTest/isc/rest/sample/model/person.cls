@@ -22,9 +22,9 @@ ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext 
 	}	
 	If (pUserContext.Username = ##class(UnitTest.isc.rest.sample.data.person).UsernameGetStored(pID)) {
 		// The current user can do anything to their own record except delete it.
-		Quit (pOperation '= "DELETE")
+		Quit (pOperation '= $$$OperationDelete)
 	}
-	Quit (pOperation = "READ") || (pOperation = "QUERY")
+	Quit (pOperation = $$$OperationRead) || (pOperation = $$$OperationQuery)
 }
 
 /// Defines a mapping of actions available for this model class to the associated methods and arguments.

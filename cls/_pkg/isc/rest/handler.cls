@@ -44,8 +44,12 @@ Parameter CONVERTINPUTSTREAM = 1;
 /// Formatting follows Semantic Versioning (https://semver.org/)
 Parameter APIVersion = "0.1.0";
 
+/// Endpoints for which <method>Supports</method> is called. Take a look at
+/// the method documentation to see how this parameter is used.
+Parameter SupportsCheckEndpoints [ Final ] = {$ListBuild("/auth/status:GET","/auth/logout:POST","/build-documentation:POST","/build-documentation:GET","/openapi.json:GET")};
+
 /// Regex for the isc.rest supported media types.
-Parameter AllowedMediaTypeRegex As STRING [ Internal ] = "application/(.*\+)?json";
+Parameter AllowedMediaTypeRegex As STRING [ Final, Internal ] = "application/(.*\+)?json";
 
 Projection HandlerProjection As %pkg.isc.rest.handlerProjection;
 
@@ -97,7 +101,7 @@ ClassMethod GetOpenAPISpecification() As %Status
 	}
 	Set result = ##class(%SQL.Statement).%ExecDirect(,
 		"select top 1 ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",
-		$classname())
+		$ClassName())
 	#Dim result As %SQL.StatementResult
 	If result.%SQLCODE = 0 {
 		Set %response.ContentType = "application/json"
@@ -125,14 +129,14 @@ ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, O
 			Return $$$ERROR(8222, "Failed to acquire BuildDocumentation lock (another build is already in progress)")
 		}
 		Set $$$DocLocksBuildGbl = 2
-		Set $$$DocTimingBuildStartGbl = $ZDateTime($Horolog, -2)
+		Set $$$DocTimingBuildStartGbl = $ZDatetime($Horolog, -2)
 		Kill $$$DocTimingBuildFinishGbl
 		Set $$$DocParameterBuildDebugGbl = debug
 		Set $$$DocParameterBuildInternalGbl = internal
 		Set status = ##class(%pkg.isc.rest.openAPI).GetSpecification(.response,, apiPath, debug, internal, 1, endpointOverride)
 		Set $$$DocStageBuildOpenAPIGbl = "Save specification..."
 		Set result = ##class(%SQL.Statement).%ExecDirect(,
-			"select ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",$classname())
+			"select ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",$ClassName())
 		#Dim result As %SQL.StatementResult
 		If result.%SQLCODE = 0 {
 			While result.%Next() {
@@ -141,20 +145,20 @@ ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, O
 		}
 		Set saveableResponse = response.GetSaveableInstance()
 		Set status2 = saveableResponse.%Save()
-		Set $$$DocTimingBuildFinishGbl = $ZDateTime($Horolog, -2)
+		Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
 		Set $$$DocLocksBuildGbl = 0
 		If 'status {
 			Set $$$DocStageBuildOpenAPIGbl = "Build failed: GetSpecification() returned false; saved anyway (console builds always save)"
 			Return $$$ERROR($$$GeneralError, "OpenAPI Specification Generation Error")
 		}
-		If $system.Status.IsError(status2) {
+		If $System.Status.IsError(status2) {
 			Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $System.Status.GetErrorText(status2) _ "; saved anyway (console builds always save)"
 			Return status2
 		}
 		Set $$$DocStageBuildOpenAPIGbl = "Finished"
 		Return $$$OK
 	} Catch e {
-		Set $$$DocTimingBuildFinishGbl = $ZDateTime($Horolog, -2)
+		Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
 		Set $$$DocLocksBuildGbl = 0
 		Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $System.Status.GetErrorText(e.AsStatus()) _ "; saved anyway (console builds always save)"
 		Return e.AsStatus()
@@ -256,7 +260,7 @@ ClassMethod BuildDocumentationInternal(debug, internal, application, userContext
 	Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
 	// OpenAPI
 	Set $$$DocLocksBuildGbl = 2
-	Set $$$DocTimingBuildStartGbl = $ZDateTime($Horolog, -2)
+	Set $$$DocTimingBuildStartGbl = $ZDatetime($Horolog, -2)
 	Kill $$$DocTimingBuildFinishGbl
 	Try
 	{
@@ -312,16 +316,16 @@ ClassMethod BuildDocumentationInternal(debug, internal, application, userContext
 			}
 		}
 		If 'status && ('getSpecificationFailed || debug) {
-			Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $system.Status.GetErrorText(status)
+			Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $System.Status.GetErrorText(status)
 		}
 	} Catch ex {
-		Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $system.Status.GetErrorText(ex.AsStatus())
+		Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $System.Status.GetErrorText(ex.AsStatus())
 	}
 	
 	// Additional documentation types go here!
 	
 	// Finish
-	Set $$$DocTimingBuildFinishGbl = $ZDateTime($Horolog, -2)
+	Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
 	Set $$$DocLocksBuildGbl = 0
 }
 
@@ -335,16 +339,41 @@ ClassMethod ModifyOpenAPISpecification(ByRef specification As %pkg.isc.rest.open
 
 /// Checks the user's permission for a documentation-related endpoint.
 /// <var>pEndpoint</var> may be one of:
-/// /build-documentation
-/// /openapi.json
-/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>
-ClassMethod CheckPermission(pEndpoint As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
+/// <ul>
+/// 	<li>/build-documentation</li>
+/// 	<li>/openapi.json</li>
+/// </ul>
+/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>.
+ClassMethod CheckPermission(pEndpoint As %String, pUserContext As %RegisteredObject, ByRef pURLParams) As %Boolean
 {
 	Quit 0
 }
 
+/// Checks if the endpoint provided is supported for the current dispatch class.
+/// If the method returns 0 for a given endpoint, requests to the endpoint will
+/// get a 404 and the endpoint will be excluded from the Open API specification. <br />
+/// Default behavior is to return 1 for all endpoints. <br />
+/// <var>pEndpoint</var> can be one of the endpoint-http verb combinations present
+/// in <parameter>SupportsCheckEndpoints</parameter>. <br />
+/// <var>pHTTPVerb</var> is the HTTP verb for the endpoint. <br />
+/// <var>pRequest</var> is the request object in an HTTP context. <br />
+ClassMethod Supports(pEndpoint As %String, pHTTPVerb As %String, pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
+{
+	Return 1
+}
+
+/// Check whether a given operation is supported for the resource.
+/// Returns 0 if the operation is not supported and sets the response status
+/// to 404 Not Found. <br />
+ClassMethod CheckSupports(pResourceClass As %Dictionary.CacheClassname, pOperation As %String, pType As %String) As %Boolean [ Final, Internal, Private ]
+{
+	// Wrap with $Get() on %request in case this is called during Open API generation
+	// and %request is not available.
+	Return $ClassMethod(pResourceClass, "Supports", pOperation, pType, $Get(%request))
+}
+
 /// Checks both strategy- and resource-level permissions
-ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams)
+ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean
 {
 	Set strategy = ..AuthenticationStrategy()
 	Set authorized = 1
@@ -368,15 +397,31 @@ ClassMethod OnPreDispatch(pUrl As %String, pMethod As %String, ByRef pContinue A
 {
 	#dim %response As %CSP.Response
 	Set sc = $$$OK
+	Set endpointList = ..#SupportsCheckEndpoints
+	Set ptr = 0
+	Set supports = 1
+	While $ListNext(endpointList,ptr,endpoint) {
+		Set url = $Piece(endpoint, ":", 1)
+		Set method = $Piece(endpoint, ":", 2)
+		If (pUrl = url) && (pMethod = method) {
+			Set supports = ..Supports(url, method, %request)
+			Quit
+		}
+	}
+	If ('supports) {
+		// If not supported, return 404
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
+	}
 	If pMethod '= "OPTIONS" { // OPTIONS requests are never authenticated
-		Set sc = $classmethod(..AuthenticationStrategy(),"Authenticate",pUrl,.pContinue)
+		Set sc = $ClassMethod(..AuthenticationStrategy(),"Authenticate",pUrl,.pContinue)
 	}
-	do:'pContinue ..OnHandleCorsRequest(pUrl)
-	if (pMethod = "GET") && $IsObject($Get(%session)) {
+	Do:'pContinue ..OnHandleCorsRequest(pUrl)
+	If (pMethod = "GET") && $IsObject($Get(%session)) {
 		// Permit concurrent GET requests
-		do %session.Unlock()
+		Do %session.Unlock()
 	}
-	quit sc
+	Quit sc
 }
 
 ClassMethod GetUserInfo() As %Status
@@ -394,51 +439,68 @@ ClassMethod GetUserInfo() As %Status
 
 ClassMethod GetUserContext() As %pkg.isc.rest.model.resource
 {
-	$$$ThrowOnError($classmethod(..AuthenticationStrategy(),"UserInfo",.userInfo))
+	$$$ThrowOnError($ClassMethod(..AuthenticationStrategy(),"UserInfo",.userInfo))
 	Quit ..GetUserResource(.userInfo)
 }
 
 ClassMethod LogOut() As %Status
 {
-	Quit $classmethod(..AuthenticationStrategy(),"Logout")
+	Quit $ClassMethod(..AuthenticationStrategy(),"Logout")
 }
 
 /// Creates a new instance of the resource (handling a POST request to the resource's endpoint)
 ClassMethod Create(resourceName As %String) As %Status
 {
+	Set operation = $$$OperationCreate
+
 	#dim %request As %CSP.Request
 	#dim %response As %CSP.Response
-	
-	// Grab the json body from the incoming reqeust
-	Set json = {}.%FromJSON(%request.Content)
 	
 	// Get proxy class based on the request's content type header and the resource
 	Set resourceClass = ..FindContentClass(resourceName)
 	If (resourceClass = "") {
 		Return $$$OK
 	}
-	
-	set userContext = ..GetUserContext()
-	if '..CheckAllPermissions(resourceClass, "", "CREATE", userContext) {
-		do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", CREATE"))
-		return $$$OK
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsCreate(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
 	}
 	
+	Set userContext = ..GetUserContext()
+	If '..CheckAllPermissions(resourceClass, "", operation, userContext) {
+		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", "_operation))
+		Return $$$OK
+	}
+	
+	// Grab the json body from the incoming reqeust
+	Set json = {}.%FromJSON(%request.Content)
 	// Instantiate a proxy without passing an id; this will give us an empty one
-	Set resourceToUse = $classmethod(resourceClass, "GetModelInstance")
+	Set resourceToUse = $ClassMethod(resourceClass, "GetModelInstance")
 	$$$ThrowOnError(resourceToUse.JSONImport(json))
 	Do resourceToUse.SaveModelInstance(userContext)
 	
 	// Respond with a json block representing the newly posted resource
 	Set %response.Status = ..#HTTP201CREATED
-	Set %response.ContentType = $parameter(resourceClass, "MEDIATYPE")
+	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
 	Do resourceToUse.JSONExport()
 
-	return $$$OK
+	Return $$$OK
+}
+
+/// Wrapper around <method>Supports</method> for the <method>Create</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsCreate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationCreate, $$$TypeOperationClass)
 }
 
 ClassMethod CollectionQuery(resourceName As %String) As %Status
 {
+	Set operation = $$$OperationQuery
+
 	// Grab the parameters that define the filters for the query
 	// These come in as URL parameters via the request
 	Kill params
@@ -447,22 +509,28 @@ ClassMethod CollectionQuery(resourceName As %String) As %Status
 	// Use the request's content type and resource name to determine which proxy class to use
 	Set resourceClass = ..FindAcceptedClass(resourceName)
 	If (resourceClass = "") {
-		Return 1
+		Return $$$OK
+	}
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsCollectionQuery(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
 	}
 	
-	set userContext = ..GetUserContext()
-	set authorized = ..CheckAllPermissions(resourceClass, "", "QUERY", userContext, .params)
-	
-	if 'authorized {
-		do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", QUERY"))
-		return 1
+	Set userContext = ..GetUserContext()
+	Set authorized = ..CheckAllPermissions(resourceClass, "", operation, userContext, .params)
+	If 'authorized {
+		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", "_operation))
+		Return $$$OK
 	}
 	
-	Set %response.ContentType = $parameter(resourceClass, "MEDIATYPE")
+	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
 	
-	try {
-		do $classmethod(resourceClass, "GetCollection", .params, ..#QuerySelectMode)
-	} catch e {
+	Try {
+		Do $ClassMethod(resourceClass, "GetCollection", .params, ..#QuerySelectMode)
+	} Catch e {
 		// For well-defined exception types, report appropriately.
 		If e.%IsA("%pkg.isc.rest.exception.queryGenerationException") {
 			Do ..ReportHttpStatusCode(e.ErrorStatus, $$$ERROR($$$GeneralError,e.DisplayString()))
@@ -472,11 +540,20 @@ ClassMethod CollectionQuery(resourceName As %String) As %Status
 		Throw e
 	}
 	
-	Return 1
+	Return $$$OK
+}
+
+/// Wrapper around <method>Supports</method> for the <method>CollectionQuery</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsCollectionQuery(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationQuery, $$$TypeOperationClass)
 }
 
 ClassMethod Retrieve(resourceName As %String, id As %String) As %Status
 {
+	Set operation = $$$OperationRead
+
 	#dim %response As %CSP.Response
 	#dim resource As %pkg.isc.rest.model.resource
 	
@@ -484,19 +561,35 @@ ClassMethod Retrieve(resourceName As %String, id As %String) As %Status
 	If (resourceClass = "") {
 		Return 1
 	}
-	
-	if '..CheckAllPermissions(resourceClass, id, "READ", ..GetUserContext()) {
-		do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID: "_id_", READ"))
-		return 1
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsRetrieve(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
 	}
 	
-	Set %response.ContentType = $parameter(resourceClass, "MEDIATYPE")
-	Set resource = $classmethod(resourceClass, "GetModelInstance", id)
+	If '..CheckAllPermissions(resourceClass, id, operation, ..GetUserContext()) {
+		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID: "_id_", "_operation))
+		Return 1
+	}
+	
+	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
+	Set resource = $ClassMethod(resourceClass, "GetModelInstance", id)
 	Quit resource.JSONExport()
+}
+
+/// Wrapper around <method>Supports</method> for the <method>Retrieve</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsRetrieve(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationInstance)
 }
 
 ClassMethod Construct(resourceName As %String) As %Status
 {
+	Set operation = $$$OperationActionNew
+
 	#dim %response As %CSP.Response
 	#dim resource As %pkg.isc.rest.model.resource
 	
@@ -504,49 +597,84 @@ ClassMethod Construct(resourceName As %String) As %Status
 	If (resourceClass = "") {
 		Return 1
 	}
+
+	// $$$OperationRead with no ID, or $$$OperationActionNew, is usable as validation for this special case.
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsConstruct(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
+	}
 	
-	// READ with no ID, or ACTION:new, is usable as a permission for this special case.
-	if '(..CheckAllPermissions(resourceClass, "", "READ", ..GetUserContext())
-		|| ..CheckAllPermissions(resourceClass, "", "ACTION:new", ..GetUserContext())) {
-		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ACTION:new"))
+	Set userContext = ..GetUserContext()
+	If '(..CheckAllPermissions(resourceClass, "", $$$OperationRead, userContext)
+		|| ..CheckAllPermissions(resourceClass, "", operation, userContext)) {
+		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", "_operation))
 		Return 1
 	}
 	
-	Set %response.ContentType = $parameter(resourceClass,"MEDIATYPE")
-	Set resource = $classmethod(resourceClass, "GetModelInstance")
+	Set %response.ContentType = $Parameter(resourceClass,"MEDIATYPE")
+	Set resource = $ClassMethod(resourceClass, "GetModelInstance")
 	Quit resource.JSONExport()
+}
+
+/// Wrapper around <method>Supports</method> for the <method>Construct</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+/// $$$OperationRead with no ID, or $$$OperationActionNew, is usable as validation for this special case.
+ClassMethod CheckSupportsConstruct(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationClass) ||
+..CheckSupports(pResourceClass, $$$OperationActionNew, $$$TypeOperationClass)
 }
 
 ClassMethod Update(resourceName As %String, id As %String) As %Status
 {
+	Set operation = $$$OperationUpdate
+
 	#dim resourceToUse As %pkg.isc.rest.model.resource
-	
-	// Grab the json body from the incoming reqeust
-	Set json = {}.%FromJSON(%request.Content)
 	
 	// Get proxy class based on the request's content type header and the resource
 	Set resourceClass = ..FindContentClass(resourceName)
 	If (resourceClass = "") {
 		Return $$$OK
 	}
-	
-	set userContext = ..GetUserContext()
-	if '..CheckAllPermissions(resourceClass, id, "UPDATE", userContext) {
-		do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID "_id_", UPDATE"))
-		return $$$OK
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsUpdate(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
 	}
 	
-	Set resourceToUse = $classmethod(resourceClass, "GetModelInstance", id)
+	Set userContext = ..GetUserContext()
+	If '..CheckAllPermissions(resourceClass, id, operation, userContext) {
+		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID "_id_", "_operation))
+		Return $$$OK
+	}
+	
+	// Grab the json body from the incoming reqeust
+	Set json = {}.%FromJSON(%request.Content)
+	Set resourceToUse = $ClassMethod(resourceClass, "GetModelInstance", id)
 	$$$ThrowOnError(resourceToUse.JSONImport(json))
 	Do resourceToUse.SaveModelInstance(userContext)
 	
-	Set %response.ContentType = $parameter(resourceClass,"MEDIATYPE")
+	Set %response.ContentType = $Parameter(resourceClass,"MEDIATYPE")
 	Do resourceToUse.JSONExport()
 	Return $$$OK
 }
 
+/// Wrapper around <method>Supports</method> for the <method>Update</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsUpdate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationUpdate, $$$TypeOperationInstance)
+}
+
 ClassMethod Delete(resourceName As %String, id As %String) As %Status
 {
+	Set operation = $$$OperationDelete
+
 	#dim %response As %CSP.Response
 	#dim resource As %pkg.isc.rest.model.resource
 	
@@ -554,13 +682,20 @@ ClassMethod Delete(resourceName As %String, id As %String) As %Status
 	If (resourceClass = "") {
 		Return 1
 	}
-	
-	if '..CheckAllPermissions(resourceClass, id, "DELETE", ..GetUserContext()) {
-		set %response.Status = ..#HTTP403FORBIDDEN
-		return 1
+
+	// First check if endpoint is supported before checking permissions
+	Set supported = ..CheckSupportsDelete(resourceClass)
+	If ('supported) {
+		Set %response.Status = ..#HTTP404NOTFOUND
+		Return $$$OK
 	}
 	
-	Set deleted = $classmethod(resourceClass, "DeleteModelInstance", id)
+	If '..CheckAllPermissions(resourceClass, id, operation, ..GetUserContext()) {
+		Set %response.Status = ..#HTTP403FORBIDDEN
+		Return $$$OK
+	}
+	
+	Set deleted = $ClassMethod(resourceClass, "DeleteModelInstance", id)
 	If deleted {
 		Set %response.Status = ..#HTTP204NOCONTENT
 	} Else {
@@ -569,65 +704,106 @@ ClassMethod Delete(resourceName As %String, id As %String) As %Status
 	Quit $$$OK
 }
 
+/// Wrapper around <method>Supports</method> for the <method>Delete</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsDelete(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationDelete, $$$TypeOperationInstance)
+}
+
 ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %Status
 {
+	Set operation = $$$OperationAction(action)
+
 	#dim %response As %CSP.Response
 	#dim resource As %pkg.isc.rest.model.resource
 
-	try {
-		kill params
-		merge params = %request.Data
+	Try {
+		Kill params
+		Merge params = %request.Data
 		
-		set actionClass = ..FindActionClass(resourceName, action, "class", .resourceClass)
-		if (actionClass = "") {
-			return 1
+		Set actionClass = ..FindActionClass(resourceName, action, "class", .resourceClass)
+		If (actionClass = "") {
+			Quit
+		}
+
+		// First check if endpoint is supported before checking permissions
+		Set supported = ..CheckSupportsDispatchClassAction(resourceClass, action)
+		If ('supported) {
+			Set %response.Status = ..#HTTP404NOTFOUND
+			Quit
 		}
 		
-		if '..CheckAllPermissions(resourceClass, "", "ACTION:"_action, ..GetUserContext(), .params) {
-			do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ACTION:"_action))
-			return 1
+		Set userContext = ..GetUserContext()
+		If '..CheckAllPermissions(resourceClass, "", operation, userContext, .params) {
+			Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", "_operation))
+			Quit
 		}
-		do $classmethod(actionClass,"HandleInvokeClassAction", %request.Method, action, ..GetUserContext())
-	} catch err {
-		if err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
-			do ..ReportHttpStatusCode(err.StatusCode)
-		} else {
-			throw err
+		Do $ClassMethod(actionClass,"HandleInvokeClassAction", %request.Method, action, userContext)
+	} Catch err {
+		If err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
+			Do ..ReportHttpStatusCode(err.StatusCode)
+		} Else {
+			Throw err
 		}
 	}
 	
-	Quit $$$OK
+	Return $$$OK
+}
+
+/// Wrapper around <method>Supports</method> for the <method>DispatchClassAction</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsDispatchClassAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationClass)
 }
 
 ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, action As %String) As %Status
 {
+	Set operation = $$$OperationAction(action)
+
 	#dim %response As %CSP.Response
 	#dim resource As %pkg.isc.rest.model.resource
-	try {	
-		kill params
-		merge params = %request.Data
+	Try {	
+		Kill params
+		Merge params = %request.Data
 		
-		set actionClass = ..FindActionClass(resourceName, action, "instance", .resourceClass)
-		if (actionClass = "") {
-			return 1
+		Set actionClass = ..FindActionClass(resourceName, action, "instance", .resourceClass)
+		If (actionClass = "") {
+			Quit
+		}
+
+		// First check if endpoint is supported before checking permissions
+		Set supported = ..CheckSupportsDispatchInstanceAction(resourceClass, action)
+		If ('supported) {
+			Set %response.Status = ..#HTTP404NOTFOUND
+			Quit
 		}
 		
-		if '..CheckAllPermissions(resourceClass, id, "ACTION:"_action, ..GetUserContext(), .params) {
-			do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID "_id_", ACTION:"_action))
-			return 1
+		Set userContext = ..GetUserContext()
+		If '..CheckAllPermissions(resourceClass, id, operation, userContext, .params) {
+			Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", ID "_id_", "_operation))
+			Quit
 		}
 		
-		set resourceInstance = $classmethod(resourceClass, "GetModelInstance", id)
-		do $classmethod(actionClass,"HandleInvokeInstanceAction", %request.Method, resourceInstance, action, ..GetUserContext())
-	} catch err {
-		if err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
-			do ..ReportHttpStatusCode(err.StatusCode)
-		} else {
-			throw err
+		Set resourceInstance = $ClassMethod(resourceClass, "GetModelInstance", id)
+		Do $ClassMethod(actionClass,"HandleInvokeInstanceAction", %request.Method, resourceInstance, action, userContext)
+	} Catch err {
+		If err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
+			Do ..ReportHttpStatusCode(err.StatusCode)
+		} Else {
+			Throw err
 		}
 	}
 	
-	Quit $$$OK
+	Return $$$OK
+}
+
+/// Wrapper around <method>Supports</method> for the <method>DispatchInstanceAction</method>
+/// operation. Use this wrapper so it can be invoked from Open API generation.
+ClassMethod CheckSupportsDispatchInstanceAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Internal ]
+{
+..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationInstance)
 }
 
 ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As %String, Output pResourceClass As %Dictionary.CacheClassname) As %Dictionary.CacheClassname [ Private ]
@@ -647,28 +823,28 @@ ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As
 				// TODO: Support this with fallback
 				Continue
 			}
-			if '$Match(accepts,..#AllowedMediaTypeRegex) {
-				do ..ReportHttpStatusCode(..#HTTP406NOTACCEPTABLE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
-				return ""
+			If '$Match(accepts,..#AllowedMediaTypeRegex) {
+				Do ..ReportHttpStatusCode(..#HTTP406NOTACCEPTABLE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
+				Return ""
 			}
 		}
 	}
 	
 	Set contentTypeList = $ListBuild(contentType)
-	if (contentType '= "") && %request.Content.Size {
-		if '$Match(contentType,..#AllowedMediaTypeRegex) {
-			do ..ReportHttpStatusCode(..#HTTP415UNSUPPORTEDMEDIATYPE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
-			return ""
+	If (contentType '= "") && %request.Content.Size {
+		If '$Match(contentType,..#AllowedMediaTypeRegex) {
+			Do ..ReportHttpStatusCode(..#HTTP415UNSUPPORTEDMEDIATYPE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
+			Return ""
 		}
 		// Try media type = $c(0) as well as the specified media type if the request content is empty
 		Set contentTypeList = contentTypeList _ $ListBuild($Char(0))
-	} elseif (contentType = "") {
-		set contentTypeList = $ListBuild($c(0))
+	} ElseIf (contentType = "") {
+		Set contentTypeList = $ListBuild($Char(0))
 	}
 	
 	#dim map As %pkg.isc.rest.actionMap
 	Set map = ##class(%pkg.isc.rest.actionMap).FindActionForRequest(
-		$Classname(),
+		$ClassName(),
 		pResource,
 		pTarget,
 		acceptsList,
@@ -761,7 +937,7 @@ ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Internal ]
 		If (qFactor '= "") {
 			Set qFactorValue = $Piece(qFactor, "=", 2)
 			If '$Match(qFactor, "q=.*") || '$IsValidDouble(qFactorValue,3,0,1) {
-				Set error = $$$ERROR($$$GeneralError,"Invalid Accept header: "_pHeader)
+				Set error = $$$ERROR($$$GeneralError,"Invalid Accept header: "_resolvedType)
 				Do ..ReportHttpStatusCode(..#HTTP400BADREQUEST,error)
 				Return ""
 			}
@@ -871,7 +1047,7 @@ ClassMethod outputStatus(pSC As %Status) As %Status [ Internal ]
             If $$$ISERR(tSC) Quit
             // Write the JSON to the output device
            	Write tJSON.%ToJSON()
-        } else {
+        } Else {
             // Set plain text
             Set %response.ContentType = ..#CONTENTTYPETEXT
             // Write out a simple text message

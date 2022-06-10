@@ -103,7 +103,7 @@ Method Request(pVerb As %String, pRoute As %String, ByRef pRequest As %CSP.Reque
 	Set pResponse = %response
 	
 	If (pRawContent '= "") && (%response.ContentType [ "json") {
-		Set pJSONContent = {}.%FromJSON(pRawContent)
+		Set pJSONContent = ##class(%DynamicAbstractObject).%FromJSON(pRawContent)
 	}
 }
 

@@ -20,9 +20,6 @@ ClassMethod GetJSONMappingClass() As %String
 
 ClassMethod GetBooleanClass() As %String
 {
-	try {
-		return ##class(%pkg.isc.json.dataType.boolean).%ClassName(1)		
-	} catch {}
 	return ##class(%Library.Boolean).%ClassName(1)
 }
 

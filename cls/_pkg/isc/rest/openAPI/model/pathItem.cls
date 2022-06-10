@@ -1,3 +1,5 @@
+Include %pkg.isc.rest.general
+
 /// A representation of the OpenAPI Specification Path Item Object (see http://spec.openapis.org/oas/v3.0.3#pathItemObject)
 Class %pkg.isc.rest.openAPI.model.pathItem Extends %pkg.isc.rest.openAPI.model.extensibleSuper
 {
@@ -80,37 +82,18 @@ Method Validate(fullSpecification As %pkg.isc.rest.openAPI.model.openAPI = "", d
 
 Method RemoveUnreachableOperations(permissionsRegex, sourceClass)
 {
-	#define CheckRemove(%arg, %permission, %sourceclass) ##Continue
-	Set removeArg = permissionsRegex="" ##Continue
-	If permissionsRegex'="" { ##Continue
-		If ..EndpointType = "action" { ##Continue
-			Set removeArg = removeArg && '$Match("ACTION:"_%arg.ActionName, permissionsRegex) ##Continue
-		} ElseIf ..EndpointType = "resource" { ##Continue
-			If %arg.ActionName = "new" { ##Continue
-				Set removeArg = removeArg && '$Match("READ", permissionsRegex) ##Continue
-			} Else { ##Continue
-				Set removeArg = removeArg && (%permission="" || '$Match(%permission, permissionsRegex)) ##Continue
-			} ##Continue
-		} ##Continue
-	} ##Continue
-	Set removeArg = removeArg && $IsObject(%arg) ##Continue
-	If ($IsObject(%arg) && ((permissionsRegex="") || (((..EndpointType="action")&&('$Match("ACTION:"_%arg.ActionName, permissionsRegex))||((..EndpointType="resource")&&((%arg.ActionName="new")&&('$Match("READ", permissionsRegex)))))||((..EndpointType="resource")&&(%permission=""||('$Match(%permission, permissionsRegex))))))) { ##Continue
-		Do %arg.RemoveAllFromSource(%sourceclass, .keepSelf) ##Continue
-		Set:'keepSelf %arg = "" ##Continue
-	}
-	
 	If ..IsInstance {
-		$$$CheckRemove(..Get, "READ", sourceClass)
+		Do ..CheckRemove(..Get, $$$OperationRead, sourceClass)
 	} Else {
-		$$$CheckRemove(..Get, "QUERY", sourceClass)
+		Do ..CheckRemove(..Get, $$$OperationQuery, sourceClass)
 	}
-	$$$CheckRemove(..Put, "UPDATE", sourceClass)
-	$$$CheckRemove(..Post, "CREATE", sourceClass)
-	$$$CheckRemove(..Delete, "DELETE", sourceClass)
-	$$$CheckRemove(..Options, "", sourceClass)
-	$$$CheckRemove(..Head, "", sourceClass)
-	$$$CheckRemove(..Patch, "", sourceClass)
-	$$$CheckRemove(..Trace, "", sourceClass)
+	Do ..CheckRemove(..Put, $$$OperationUpdate, sourceClass)
+	Do ..CheckRemove(..Post, $$$OperationCreate, sourceClass)
+	Do ..CheckRemove(..Delete, $$$OperationDelete, sourceClass)
+	Do ..CheckRemove(..Options, "", sourceClass)
+	Do ..CheckRemove(..Head, "", sourceClass)
+	Do ..CheckRemove(..Patch, "", sourceClass)
+	Do ..CheckRemove(..Trace, "", sourceClass)
 	
 	Set found = 0
 	Set found = found || ($IsObject(..Get) && (..Get.SourceClasses.Find(sourceClass)'=""))
@@ -123,6 +106,29 @@ Method RemoveUnreachableOperations(permissionsRegex, sourceClass)
 	Set found = found || ($IsObject(..Trace) && (..Trace.SourceClasses.Find(sourceClass)'=""))
 	If 'found {
 		Do ..SourceClasses.RemoveAt(..SourceClasses.Find(sourceClass))
+	}
+}
+
+Method CheckRemove(pOperationObj As %pkg.isc.rest.openAPI.model.operation, pPermissionRegex As %String, pPermission As %String, pSourceClass As %Dictionary.CacheClassname) [ Internal, Private ]
+{
+	Set removeArg = (pPermissionRegex = "")
+	If (pPermissionRegex '= "") {
+		If (..EndpointType = "action") {
+			Set removeArg = removeArg && '$Match($$$OperationAction(pOperationObj.ActionName), pPermissionRegex)
+		} ElseIf ..EndpointType = "resource" {
+			If pOperationObj.ActionName = "new" {
+				Set removeArg = removeArg && '$Match($$$OperationRead, pPermissionRegex)
+			} Else {
+				Set removeArg = removeArg && ((pPermission = "") || '$Match(pPermission, pPermissionRegex))
+			}
+		}
+	}
+	Set removeArg = removeArg && $IsObject(pOperationObj)
+	If ($IsObject(pOperationObj) && ((pPermissionRegex="") || (((..EndpointType = "action") && ('$Match($$$OperationAction(pOperationObj.ActionName), pPermissionRegex)) || ((..EndpointType="resource")&&((pOperationObj.ActionName="new")&&('$Match($$$OperationRead, pPermissionRegex)))))||((..EndpointType="resource")&&(pPermission=""||('$Match(pPermission, pPermissionRegex))))))) {
+		Do pOperationObj.RemoveAllFromSource(pSourceClass, .keepSelf)
+		If ('keepSelf) {
+			Set pOperationObj = $$$NULLOREF
+		}
 	}
 }
 
