@@ -17,7 +17,7 @@ ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext 
     If pUserContext.IsAdmin {
         Quit 1
     } Else {
-	    Quit ((pOperation = "QUERY") || (pOperation = "READ"))
+	    Quit ((pOperation = $$$OperationQuery) || (pOperation = $$$OperationRead))
     }
 }
 
@@ -194,3 +194,4 @@ Storage SQLStorage
 }
 
 }
+

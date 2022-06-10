@@ -21,9 +21,9 @@ Property Context As %String;
 
 Property Operation As %String;
 
-Property Granted As %pkg.isc.json.dataType.boolean [ Calculated, Transient ];
+Property Granted As %Boolean [ Calculated, Transient ];
 
-Method GrantedGet() As %pkg.isc.json.dataType.boolean
+Method GrantedGet() As %Boolean
 {
 	Quit ..ClassContextExists(..ResourceClass, ..Context, ..Operation)
 }

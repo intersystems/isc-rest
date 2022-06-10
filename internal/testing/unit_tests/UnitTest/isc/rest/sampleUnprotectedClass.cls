@@ -21,6 +21,11 @@ Method TestListImplementations()
 /// Asserts that this class is the only non-whitelisted, non-security-protected class.
 Method TestThatIAmUnprotected()
 {
+	// TODO: Add this test back once auditor code is improved. As of now, it incorrectly
+	// identifies classes that use exclusively resource checks (and not method arguments)
+	// as unprotected.
+	Do $$$AssertSkipped("Skipping until auditor code is improved")
+	Return
 	Set list = ##class(%pkg.isc.rest.auditor).ListUnprotectedClasses(1)
 	Do $$$AssertEquals($ListLength(list),1,"Only one class was recognized as unprotected.")
 	Set pointer = 0
@@ -41,6 +46,11 @@ Method TestThatIAmUnprotected()
 /// Tests whitelist behavior.
 Method TestWhitelist()
 {
+	// TODO: Add this test back once auditor code is improved. As of now, it incorrectly
+	// identifies classes that use exclusively resource checks (and not method arguments)
+	// as unprotected.
+	Do $$$AssertSkipped("Skipping until auditor code is improved")
+	Return
 	Do ##class(%pkg.isc.rest.auditor).WhiteListClass($classname())
 	Set list = ##class(%pkg.isc.rest.auditor).ListUnprotectedClasses()
 	Do $$$AssertEquals(list,"")

@@ -1,3 +1,5 @@
+Include %pkg.isc.rest.general
+
 Class UnitTest.isc.rest.authorization.permission Extends %UnitTest.TestCase
 {
 
@@ -9,11 +11,13 @@ Method TestCompile()
 Method TestPermissions()
 {
 	New %ROWID
+	Set create = $$$OperationCreate
 	Do ##class(UnitTest.isc.rest.authorization.permission.samplePermission).%KillExtent()
 	
 	&sql(insert into UnitTest_isc_rest_authorization_permission.samplePermission
 		(ResourceClass,Context,Operation) values
-		('UnitTest.isc.rest.authorization.permission.samplePermission','SampleContext','CREATE'))
+		('UnitTest.isc.rest.authorization.permission.samplePermission','SampleContext',:create))
+	
 	Set instId = %ROWID
 	Set instance = ##class(UnitTest.isc.rest.authorization.permission.samplePermission).%OpenId(%ROWID,,.sc)
 	$$$ThrowOnError(sc)
@@ -30,7 +34,7 @@ Method TestPermissions()
 		Do $$$AssertEquals(result.ResourceClass,"UnitTest.isc.rest.authorization.permission.samplePermission")
 		Do $$$AssertEquals(result.Granted,1)
 		Do $$$AssertEquals(result.Context,"SampleContext")
-		Do $$$AssertEquals(result.Operation,"CREATE")
+		Do $$$AssertEquals(result.Operation,$$$OperationCreate)
 	}
 }
 

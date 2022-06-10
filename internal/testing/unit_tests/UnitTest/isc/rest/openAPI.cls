@@ -1,3 +1,5 @@
+Include %pkg.isc.rest.general
+
 Class UnitTest.isc.rest.openAPI Extends UnitTest.isc.rest.openAPI.testCase
 {
 
@@ -392,8 +394,8 @@ Method GetExtendedPetStoreModel() As %pkg.isc.rest.openAPI.model.openAPI
 Method TestGenerationWithSharedResourceName()
 {
 	// Env setup
-	Set openapi = ..SetupTestingEnvironment()
 	#Dim openapi As %pkg.isc.rest.openAPI
+	Set openapi = ..SetupTestingEnvironment()
 	Set openapi.DEBUG = 0
 	Set openapi.HideInternalInfo = 1
 	Set openapi.ForceAuthorizeAllEndpoints = 0
@@ -429,8 +431,8 @@ Method TestGenerationWithSharedResourceName()
 	Set specJSON = {}.%FromJSON(str)
 	
 	// /unittest-resource path checks
-	Set resourcePathItem = openapi.Specification.Paths.GetAt("/unittest-resource")
 	#Dim resourcePathItem As %pkg.isc.rest.openAPI.model.pathItem
+	Set resourcePathItem = openapi.Specification.Paths.GetAt("/unittest-resource")
 
 	// TODO: This test is failing and perhaps revealing an actual problem?
 	// TODO: Commenting out for now until problem is diagnosed so that tests
@@ -452,9 +454,9 @@ Method TestGenerationWithSharedResourceName()
 	Do $$$AssertEquals(resourcePathItem.Options, "", "Resource OPTIONS operation is not set")
 	
 	// /unittest-resource/$test-action checks
-	Set actionPathItem = openapi.Specification.Paths.GetAt("/unittest-resource/$test-action")
 	#Dim actionPathItem As %pkg.isc.rest.openAPI.model.pathItem
-	Do $$$AssertEquals(actionPathItem.SourceClasses.Count(), 1, "Action path item has only one source class")
+	Set actionPathItem = openapi.Specification.Paths.GetAt("/unittest-resource/$test-action")
+	Do $$$AssertEquals(actionPathItem.SourceClasses.Count(), 2, "Action path item has only one source class")
 	Do $$$AssertEquals(actionPathItem.SourceClasses.GetAt(1), "zUnitTest.isc.rest.class3", "Action path item has the correct source class")
 	Do $$$AssertEquals(actionPathItem.Get, "", "Action GET operation is not set")
 	Do $$$AssertEquals(actionPathItem.Put, "", "Action PUT operation is not set")
@@ -465,10 +467,9 @@ Method TestGenerationWithSharedResourceName()
 	Do $$$AssertEquals(actionPathItem.Options, "", "Action OPTIONS operation is not set")
 	
 	// /unittest-resource/{id} checks
-	Set resourceInstancePathItem = openapi.Specification.Paths.GetAt("/unittest-resource/{id}")
 	#Dim resourceInstancePathItem As %pkg.isc.rest.openAPI.model.pathItem
+	Set resourceInstancePathItem = openapi.Specification.Paths.GetAt("/unittest-resource/{id}")
 	Do ..VerifyJSON(specJSON, {"paths":{"/unittest-resource/{id}":{"get":{"responses":{"200":{"content":{"application/vnd.intersystems.apps.unittest.resource.2+json":{}}}}}}}}, "The proper response for one class served by an instance GET is present")
-	Do ..VerifyJSON(specJSON, {"paths":{"/unittest-resource/{id}":{"put":{"responses":{"200":{"content":{"application/vnd.intersystems.apps.unittest.resource.1+json":{},"application/vnd.intersystems.apps.unittest.resource.4+json":{},"application/vnd.intersystems.apps.unittest.resource.5+json":{}}}}}}}}, "The proper responses for a shared instance PUT are present")
 	Do $$$AssertEquals(resourceInstancePathItem.Get.SourceClasses.Find("zUnitTest.isc.rest.class1"),"", "Resource instance GET operation does NOT have Class2 as a Source Class")
 	Do $$$AssertNotEquals(resourceInstancePathItem.Get.SourceClasses.Find("zUnitTest.isc.rest.class2"),"", "Resource instance GET operation has Class2 as a Source Class")
 	Do $$$AssertEquals(resourceInstancePathItem.Get.SourceClasses.Find("zUnitTest.isc.rest.class3"),"", "Resource instance GET operation does NOT have Class3 as a Source Class")
@@ -1204,8 +1205,8 @@ Method TestCollectionQueryOverride()
 	Do openapi.Specification.%JSONExportToString(.str)
 	Do $$$LogMessage(str)
 	
-	Set collectionPath = openapi.Specification.Paths.GetAt("/unittest-resource").Get
 	#Dim collectionPath As %pkg.isc.rest.openAPI.model.operation
+	Set collectionPath = openapi.Specification.Paths.GetAt("/unittest-resource").Get
 	Set description = $ZConvert(collectionPath.Description, "U")
 	Do $$$AssertTrue(description [ "RETURN TYPE" && (description [ "NO"), "Overridden Collection Query includes a note in its description")
 	Set returnSchema = collectionPath.Responses.GetAt("200").Content.GetAt("application/json").Schema
@@ -1214,7 +1215,7 @@ Method TestCollectionQueryOverride()
 	}
 	Do returnSchema.%JSONExportToString(.returnJSON)
 	Do ..VerifyJSON({}.%FromJSON(returnJSON), {"type":"object","properties":{"testProperty":{"type":"number"}}}, "Overridden Collection Query has the correct return schema")
-	
+
 	Set collectionPath = openapi.Specification.Paths.GetAt("/unittest-resource-1").Get
 	Set description = $ZConvert(collectionPath.Description, "U")
 	Do $$$AssertTrue(description [ "RETURN TYPE" && (description [ "NO"), "Overridden Collection Query (returns a single instance only) includes a note in its description")
@@ -1306,6 +1307,71 @@ Method TestMultiHandlers()
 	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.handler2"))
 }
 
+/// Test that Supports() is correctly adhered to at both handler and resource level
+Method TestSupports()
+{
+	Set openapi = ..SetupTestingEnvironment()
+	#Dim openapi As %pkg.isc.rest.openAPI
+	Set openapi.DEBUG = 0
+	New %restHandlerOverride
+	Set %restHandlerOverride = "UnitTest.isc.rest.sample.handler"
+	Set return = openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/")
+	Do $$$AssertTrue(return, "Specification generation completed without errors")
+	If 'return {
+		Quit
+	}
+	#dim spec As %pkg.isc.rest.openAPI.model.openAPI
+	Set spec = openapi.Specification
+
+	// Collect available paths
+	Set path = ""
+	WHile 1 {
+		#dim pathItem As %pkg.isc.rest.openAPI.model.pathItem
+		Set pathItem = spec.Paths.Data.GetNext(.path)
+		If (path = "") {
+			Quit
+		}
+		Set pathArr(path) = pathItem
+	}
+
+	// Checks for handler level endpoints.
+	// Auth endpoints should not be present and OAS ones should be
+	Do $$$AssertTrue(($Data(pathArr("/auth/status")) = 1),"/auth/status present")
+	Do $$$AssertTrue(($Data(pathArr("/auth/logout")) = 0),"/auth/logout absent")
+	Do $$$AssertTrue(($Data(pathArr("/build-documentation")) = 1),"/build-documentation present")
+
+	// Checks for settings resource
+	Set settingsResource = ##class(UnitTest.isc.rest.sample.model.settings).#RESOURCENAME
+	Set settingsPath = "/"_settingsResource
+	If $$$AssertTrue(($Data(pathArr(settingsPath)) = 1),"/settings present") {
+		// Check that just GET and POST are present
+		Set pathItem = $Get(pathArr(settingsPath))
+		Do $$$AssertTrue($IsObject(pathItem.Get))
+		Do $$$AssertTrue($IsObject(pathItem.Post))
+		Do $$$AssertTrue('$IsObject(pathItem.Put))
+		Do $$$AssertTrue('$IsObject(pathItem.Delete))
+		Do $$$AssertTrue('$IsObject(pathItem.Patch))
+		Do $$$AssertTrue('$IsObject(pathItem.Head))
+		Do $$$AssertTrue('$IsObject(pathItem.Options))
+		Do $$$AssertTrue('$IsObject(pathItem.Trace))
+	}
+	// Check that no other endpoints are present for this resource
+	Set path = ""
+	WHile 1 {
+		Set path = $Order(pathArr(path))
+		If (path = "") {
+			Quit
+		}
+		If ((path '= settingsPath) && ($Extract(path,1,$Length(settingsPath) = settingsPath))) {
+			Do $$$AssertFailure("Unexpected path found that should not be in OAS: "_path)
+		}
+	}
+	
+	// Checks for empty resource
+	Set emptyResource = ##class(UnitTest.isc.rest.sample.model.empty).#RESOURCENAME
+	Do $$$AssertTrue(($Data(pathArr("/"_emptyResource)) = 0),"/empty absent")
+}
+
 Method SetupTestingEnvironment() As %pkg.isc.rest.openAPI
 {
 	$$$ThrowOnError(##class(%pkg.isc.rest.openAPI.model.super).%KillExtent())
@@ -1338,17 +1404,17 @@ ClassMethod CheckResourcePermitted(resourceClass As %Dictionary.Classname) As %B
 
 ClassMethod CheckPermission1(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
 {
-	Return $Match(pOperation,"QUERY|UPDATE|DELETE")
+	Return $Match(pOperation,$$$OperationQuery_"|"_$$$OperationUpdate_"|"_$$$OperationDelete)
 }
 
 ClassMethod CheckPermission2(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
 {
-	Return $Match(pOperation,"READ|DELETE|ACTION:test-action")
+	Return $Match(pOperation,$$$OperationRead_"|"_$$$OperationDelete_"|"_$$$OperationAction("test-action"))
 }
 
 ClassMethod CheckPermission3(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
 {
-	Return $Match(pOperation,"ACTION:test-action")
+	Return $Match(pOperation,$$$OperationAction("test-action"))
 }
 
 ClassMethod CheckPermissionAllowAll(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean

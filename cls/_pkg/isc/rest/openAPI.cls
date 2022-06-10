@@ -79,7 +79,6 @@ Property StageGlobal [ Internal, Private ];
 /// @Override: Sets up new instances of this class
 Method %OnNew() As %Status
 {
-	#define ResourcePathNotForbidden(%arg) ((..IncludeForbiddenEndpoints || ..ForceAuthorizeAllEndpoints) && ('resourceSchema.ForbidResource%arg || 'resourceSchema.ForbidUnderAllCircumstances)) || 'resourceSchema.ForbidResource%arg
 	#define WriteSection(%text) do ..WriteSection(%text, .ws, .timer)
 	
 	Set ..Specification = ##class(%pkg.isc.rest.openAPI.model.openAPI).%New()
@@ -980,6 +979,8 @@ Method WriteErrorSchemas() [ Internal, Private ]
 
 Method WriteResourceEndpoints() [ Internal, Private ]
 {
+	#define ResourcePathNotForbidden(%arg) (resourceSchema.Supports%arg && (((..IncludeForbiddenEndpoints || ..ForceAuthorizeAllEndpoints) && ('resourceSchema.ForbidResource%arg || 'resourceSchema.ForbidUnderAllCircumstances)) || 'resourceSchema.ForbidResource%arg))
+
 	// TODO: GetModelFromResultRow() support
 	// TODO: What HTTP Code is thrown when an id can't be found?
 	
@@ -1500,9 +1501,10 @@ Method WriteActionEndpoints() [ Internal, Private ]
 	
 	// Write the class endpoints here!
 	For i=1:1:..ActionInfo.Count() {
+		#dim actionSchema As %pkg.isc.rest.openAPI.actionInfo
 		Set actionSchema = ..ActionInfo.GetAt(i)
-		If (actionSchema.Forbidden && actionSchema.ForbidUnderAllCircumstances) ||
-		   ('..IncludeForbiddenEndpoints && '..ForceAuthorizeAllEndpoints && actionSchema.Forbidden) {
+		If ('actionSchema.Supported) && ((actionSchema.Forbidden && actionSchema.ForbidUnderAllCircumstances) ||
+		   ('..IncludeForbiddenEndpoints && '..ForceAuthorizeAllEndpoints && actionSchema.Forbidden)) {
 			Continue
 		}
 		#dim pathObj As %pkg.isc.rest.openAPI.model.pathItem
@@ -1717,161 +1719,181 @@ Method WriteOtherEndpoints() [ Internal, Private ]
 {
 	// Authentication Endpoints
 	// Status
-	#Dim authPath As %pkg.isc.rest.openAPI.model.pathItem
-	Set authPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
-	Set authPath.EndpointType = "other"
-	Set authPath.Get = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
-	Set authPath.Get.Description = "Get information about the current user"
-	Set authPath.Get.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
-	#Dim response200 As %pkg.isc.rest.openAPI.model.response
-	Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response200.Description = "A representation of the current user"
-	Set responseMediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
-	Set userResourceClass = ##class(%Dictionary.CompiledMethod).%OpenId(..DispatchClass_"||GetUserResource").ReturnType
-	Set userResourceStub = ##class(%pkg.isc.rest.openAPI.resourceInfoStub).%New(userResourceClass, "")
-	Do userResourceStub.PopulateNonOverwrittenValues()
-	Set responseMediatype.Schema = ##class(%pkg.isc.rest.openAPI.schema).GetSchema(userResourceStub, , "output", ..NeededClasses, $This, 1)
-	Set mediatype = ##class(%Dictionary.CompiledParameter).%OpenId(userResourceClass_"||MEDIATYPE").Default
-	Do response200.Content.SetAt(responseMediatype, mediatype)
-	Do authPath.Get.Responses.SetAt(response200, "200")
-	#Dim response204 As %pkg.isc.rest.openAPI.model.response
-	Set response204 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response204.Description = "No Content: No information was found on the current user"
-	Do authPath.Get.Responses.SetAt(response204, "204")
-	Do ..Specification.Paths.SetAt(authPath, "/auth/status")
+	Set endpoint = "/auth/status"
+	If $ClassMethod(..DispatchClass,"Supports",endpoint,"GET") {
+		#Dim authPath As %pkg.isc.rest.openAPI.model.pathItem
+		Set authPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
+		Set authPath.EndpointType = "other"
+		Set authPath.Get = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
+		Set authPath.Get.Description = "Get information about the current user"
+		Set authPath.Get.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
+		#Dim response200 As %pkg.isc.rest.openAPI.model.response
+		Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+		Set response200.Description = "A representation of the current user"
+		Set responseMediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
+		Set userResourceClass = ##class(%Dictionary.CompiledMethod).%OpenId(..DispatchClass_"||GetUserResource").ReturnType
+		Set userResourceStub = ##class(%pkg.isc.rest.openAPI.resourceInfoStub).%New(userResourceClass, "")
+		Do userResourceStub.PopulateNonOverwrittenValues()
+		Set responseMediatype.Schema = ##class(%pkg.isc.rest.openAPI.schema).GetSchema(userResourceStub, , "output", ..NeededClasses, $This, 1)
+		Set mediatype = ##class(%Dictionary.CompiledParameter).%OpenId(userResourceClass_"||MEDIATYPE").Default
+		Do response200.Content.SetAt(responseMediatype, mediatype)
+		Do authPath.Get.Responses.SetAt(response200, "200")
+		#Dim response204 As %pkg.isc.rest.openAPI.model.response
+		Set response204 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+		Set response204.Description = "No Content: No information was found on the current user"
+		Do authPath.Get.Responses.SetAt(response204, "204")
+		Do ..Specification.Paths.SetAt(authPath, endpoint)
+	}
 	// Logout
-	Set authPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
-	Set authPath.EndpointType = "other"
-	Set authPath.Post = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
-	Set authPath.Post.Description = "Log out the current user"
-	//  TODO ...responses?
-	Set authPath.Post.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
-	Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response200.Description = "A successful response"
-	Do authPath.Post.Responses.SetAt(response200, "200")
-	Do ..Specification.Paths.SetAt(authPath, "/auth/logout")
+	Set endpoint = "/auth/logout"
+	If $ClassMethod(..DispatchClass,"Supports",endpoint,"POST") {
+		Set authPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
+		Set authPath.EndpointType = "other"
+		Set authPath.Post = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
+		Set authPath.Post.Description = "Log out the current user"
+		//  TODO ...responses?
+		Set authPath.Post.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
+		Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+		Set response200.Description = "A successful response"
+		Do authPath.Post.Responses.SetAt(response200, "200")
+		Do ..Specification.Paths.SetAt(authPath, endpoint)
+	}
 	
 	// Documentation Endpoints
-	Set buildDocsPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
-	Set buildDocsPath.EndpointType = "other"
-	Set buildDocsPath.Post = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
-	Set buildDocsPath.Post.Description = "Trigger a (re)build of REST API documentation"
-	Set buildDocsPath.Post.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
-	Set response403 = ##class(%pkg.isc.rest.openAPI.model.responseReference).%New()
-	Set response403.Ref = "#/components/responses/403"
-	Do buildDocsPath.Post.Responses.SetAt(response403, "403")
-	Set debugParam = ##class(%pkg.isc.rest.openAPI.model.parameter).%New()
-	Set debugParam.Name = "debug"
-	Set debugParam.In = "query"
-	Set debugParam.Schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set debugParam.Schema.AutoGenerated = 1
-	Set debugParam.Schema.Type = "integer"
-	Set debugParam.Description = "The debug level to build documentation with (defaults to 0 if not specified)"
-	Do buildDocsPath.Post.Parameters.Insert(debugParam)
-	Set internalParam = ##class(%pkg.isc.rest.openAPI.model.parameter).%New()
-	Set internalParam.Name = "internal"
-	Set internalParam.In = "query"
-	Set internalParam.Schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set internalParam.Schema.AutoGenerated = 1
-	Set internalParam.Schema.Type = "integer"
-	Set internalParam.Description = "Whether or not documentation should be built for readers with source code access (defaults to 0=false if not specified)"
-	Do buildDocsPath.Post.Parameters.Insert(internalParam)
-	Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response200.Description = "Information about the started build"
-	Set mediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
-	Set schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set schema.AutoGenerated = 1
-	Set schema.Type = "object"
-	Set statusURLSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set statusURLSchema.AutoGenerated = 1
-	Set statusURLSchema.Type = "string"
-	Set statusURLSchema.Description = "URL to view the status of the started build"
-	Set statusMethodSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set statusMethodSchema.AutoGenerated = 1
-	Set statusMethodSchema.Type = "string"
-	Set statusMethodSchema.Description = "HTTP Method to use in conjunction with statusUrl"
-	Set startedSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set startedSchema.AutoGenerated = 1
-	Set startedSchema.Type = "boolean"
-	Set startedSchema.Description = "Whether or not the requested build was started successfully"
-	Do schema.Properties.SetAt(statusURLSchema, "statusUrl")
-	Do schema.Properties.SetAt(statusMethodSchema, "statusMethod")
-	Do schema.Properties.SetAt(startedSchema, "buildStarted")
-	Set schema.Example = ##class(%pkg.isc.rest.openAPI.model.genericObject).From({"statusUrl":"/build-documentation","statusMethod":"GET","buildStarted":true})
-	Set mediatype.Schema = schema
-	Do response200.Content.SetAt(mediatype, "application/json")
-	Do buildDocsPath.Post.Responses.SetAt(response200, "200")
-	Set response423 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response423.Description = "Locked: Another build is currently in-progress, try again later"
-	Do response423.Content.SetAt(mediatype.%ConstructClone(1), "application/json")
-	Do buildDocsPath.Post.Responses.SetAt(response423, "423")
-	Set buildDocsPath.Get = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
-	Set buildDocsPath.Get.Description = "Get information on the current REST API documentation build"
-	Set buildDocsPath.Get.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
-	Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
-	Set response200.Description = "The status of either the build that is currently in-progress, or the last build if no build is currently in-progress"
-	Set schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set schema.AutoGenerated = 1
-	Set schema.Type = "object"
-	Set schema.Description = "Information on the status of a build"
-	Set inProgressSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set inProgressSchema.AutoGenerated = 1
-	Set inProgressSchema.Type = "boolean"
-	Set inProgressSchema.Description = "Whether or not the build is currently in-progress"
-	Set startTimeSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set startTimeSchema.AutoGenerated = 1
-	Set startTimeSchema.Type = "integer"
-	Set startTimeSchema.Description = "When the build was started (Unix time)"
-	Set endTimeSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set endTimeSchema.AutoGenerated = 1
-	Set endTimeSchema.Type = "integer"
-	Set endTimeSchema.Description = "When the build finished (Unix time), 0 = not-yet-determined"
-	Set progressSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set progressSchema.AutoGenerated = 1
-	Set progressSchema.Type = "object"
-	Set stageSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set stageSchema.AutoGenerated = 1
-	Set stageSchema.Type = "integer"
-	Set stageSchema.Description = "The current stage of the over-all build process (monotonically increasing for a given build)"
-	Set openapiSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set openapiSchema.AutoGenerated = 1
-	Set openapiSchema.Type = "string"
-	Set openapiSchema.Description = "The current stage of the OpenAPI build process"
-	Set parametersSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set parametersSchema.AutoGenerated = 1
-	Set parametersSchema.Type = "object"
-	Set debugSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set debugSchema.AutoGenerated = 1
-	Set debugSchema.Type = "integer"
-	Set debugSchema.Description = "The build's debug parameter"
-	Set internalSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set internalSchema.AutoGenerated = 1
-	Set internalSchema.Type = "integer"
-	Set internalSchema.Description = "The build's internal parameter"
-	Set userContextSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set userContextSchema.AutoGenerated = 1
-	Set userContextSchema.Type = "object"
-	Set userContextID = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
-	Set userContextID.AutoGenerated = 1
-	Set userContextID.Type = "string"
-	Set userContextID.Description = "The ID of the UserContext() that triggered this build (or the empty string if no such context exists)"
-	Do schema.Properties.SetAt(inProgressSchema, "buildInProgress")
-	Do schema.Properties.SetAt(startTimeSchema, "buildStartedTime")
-	Do schema.Properties.SetAt(endTimeSchema, "buildFinishedTime")
-	Do progressSchema.Properties.SetAt(stageSchema, "buildStage")
-	Do progressSchema.Properties.SetAt(openapiSchema, "OpenAPI")
-	Do schema.Properties.SetAt(progressSchema, "buildProgress")
-	Do parametersSchema.Properties.SetAt(debugSchema, "debug")
-	Do parametersSchema.Properties.SetAt(internalSchema, "internal")
-	Do userContextSchema.Properties.SetAt(userContextID, "_id")
-	Do parametersSchema.Properties.SetAt(userContextSchema, "userContext")
-	Do schema.Properties.SetAt(parametersSchema, "buildParameters")
-	Set mediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
-	Set mediatype.Schema = schema
-	Do response200.Content.SetAt(mediatype, "application/json")
-	Do buildDocsPath.Get.Responses.SetAt(response200, "200")
-	Do buildDocsPath.Get.Responses.SetAt(response403.%ConstructClone(), "403")
-	Do ..Specification.Paths.SetAt(buildDocsPath, "/build-documentation")
+	Set endpoint = "/build-documentation"
+	Set supportsBuildDocCreate = $ClassMethod(..DispatchClass,"Supports",endpoint,"POST")
+	Set supportsBuildDocGet = $ClassMethod(..DispatchClass,"Supports",endpoint,"GET")
+	If supportsBuildDocCreate || supportsBuildDocGet {
+		Set buildDocsPath = ##class(%pkg.isc.rest.openAPI.model.pathItem).%New()
+		Set buildDocsPath.EndpointType = "other"
+		Set response403 = ##class(%pkg.isc.rest.openAPI.model.responseReference).%New()
+		Set response403.Ref = "#/components/responses/403"
+
+		// POST
+		If supportsBuildDocCreate {
+			Set buildDocsPath.Post = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
+			Set buildDocsPath.Post.Description = "Trigger a (re)build of REST API documentation"
+			Set buildDocsPath.Post.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
+			Do buildDocsPath.Post.Responses.SetAt(response403, "403")
+			Set debugParam = ##class(%pkg.isc.rest.openAPI.model.parameter).%New()
+			Set debugParam.Name = "debug"
+			Set debugParam.In = "query"
+			Set debugParam.Schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set debugParam.Schema.AutoGenerated = 1
+			Set debugParam.Schema.Type = "integer"
+			Set debugParam.Description = "The debug level to build documentation with (defaults to 0 if not specified)"
+			Do buildDocsPath.Post.Parameters.Insert(debugParam)
+			Set internalParam = ##class(%pkg.isc.rest.openAPI.model.parameter).%New()
+			Set internalParam.Name = "internal"
+			Set internalParam.In = "query"
+			Set internalParam.Schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set internalParam.Schema.AutoGenerated = 1
+			Set internalParam.Schema.Type = "integer"
+			Set internalParam.Description = "Whether or not documentation should be built for readers with source code access (defaults to 0=false if not specified)"
+			Do buildDocsPath.Post.Parameters.Insert(internalParam)
+			Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+			Set response200.Description = "Information about the started build"
+			Set mediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
+			Set schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set schema.AutoGenerated = 1
+			Set schema.Type = "object"
+			Set statusURLSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set statusURLSchema.AutoGenerated = 1
+			Set statusURLSchema.Type = "string"
+			Set statusURLSchema.Description = "URL to view the status of the started build"
+			Set statusMethodSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set statusMethodSchema.AutoGenerated = 1
+			Set statusMethodSchema.Type = "string"
+			Set statusMethodSchema.Description = "HTTP Method to use in conjunction with statusUrl"
+			Set startedSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set startedSchema.AutoGenerated = 1
+			Set startedSchema.Type = "boolean"
+			Set startedSchema.Description = "Whether or not the requested build was started successfully"
+			Do schema.Properties.SetAt(statusURLSchema, "statusUrl")
+			Do schema.Properties.SetAt(statusMethodSchema, "statusMethod")
+			Do schema.Properties.SetAt(startedSchema, "buildStarted")
+			Set schema.Example = ##class(%pkg.isc.rest.openAPI.model.genericObject).From({"statusUrl":"/build-documentation","statusMethod":"GET","buildStarted":true})
+			Set mediatype.Schema = schema
+			Do response200.Content.SetAt(mediatype, "application/json")
+			Do buildDocsPath.Post.Responses.SetAt(response200, "200")
+			Set response423 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+			Set response423.Description = "Locked: Another build is currently in-progress, try again later"
+			Do response423.Content.SetAt(mediatype.%ConstructClone(1), "application/json")
+			Do buildDocsPath.Post.Responses.SetAt(response423, "423")
+		}
+
+		// GET
+		If supportsBuildDocGet {
+			Set buildDocsPath.Get = ##class(%pkg.isc.rest.openAPI.model.operation).%New()
+			Set buildDocsPath.Get.Description = "Get information on the current REST API documentation build"
+			Set buildDocsPath.Get.Responses = ##class(%pkg.isc.rest.openAPI.model.responses).%New()
+			Set response200 = ##class(%pkg.isc.rest.openAPI.model.response).%New()
+			Set response200.Description = "The status of either the build that is currently in-progress, or the last build if no build is currently in-progress"
+			Set schema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set schema.AutoGenerated = 1
+			Set schema.Type = "object"
+			Set schema.Description = "Information on the status of a build"
+			Set inProgressSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set inProgressSchema.AutoGenerated = 1
+			Set inProgressSchema.Type = "boolean"
+			Set inProgressSchema.Description = "Whether or not the build is currently in-progress"
+			Set startTimeSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set startTimeSchema.AutoGenerated = 1
+			Set startTimeSchema.Type = "integer"
+			Set startTimeSchema.Description = "When the build was started (Unix time)"
+			Set endTimeSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set endTimeSchema.AutoGenerated = 1
+			Set endTimeSchema.Type = "integer"
+			Set endTimeSchema.Description = "When the build finished (Unix time), 0 = not-yet-determined"
+			Set progressSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set progressSchema.AutoGenerated = 1
+			Set progressSchema.Type = "object"
+			Set stageSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set stageSchema.AutoGenerated = 1
+			Set stageSchema.Type = "integer"
+			Set stageSchema.Description = "The current stage of the over-all build process (monotonically increasing for a given build)"
+			Set openapiSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set openapiSchema.AutoGenerated = 1
+			Set openapiSchema.Type = "string"
+			Set openapiSchema.Description = "The current stage of the OpenAPI build process"
+			Set parametersSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set parametersSchema.AutoGenerated = 1
+			Set parametersSchema.Type = "object"
+			Set debugSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set debugSchema.AutoGenerated = 1
+			Set debugSchema.Type = "integer"
+			Set debugSchema.Description = "The build's debug parameter"
+			Set internalSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set internalSchema.AutoGenerated = 1
+			Set internalSchema.Type = "integer"
+			Set internalSchema.Description = "The build's internal parameter"
+			Set userContextSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set userContextSchema.AutoGenerated = 1
+			Set userContextSchema.Type = "object"
+			Set userContextID = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
+			Set userContextID.AutoGenerated = 1
+			Set userContextID.Type = "string"
+			Set userContextID.Description = "The ID of the UserContext() that triggered this build (or the empty string if no such context exists)"
+			Do schema.Properties.SetAt(inProgressSchema, "buildInProgress")
+			Do schema.Properties.SetAt(startTimeSchema, "buildStartedTime")
+			Do schema.Properties.SetAt(endTimeSchema, "buildFinishedTime")
+			Do progressSchema.Properties.SetAt(stageSchema, "buildStage")
+			Do progressSchema.Properties.SetAt(openapiSchema, "OpenAPI")
+			Do schema.Properties.SetAt(progressSchema, "buildProgress")
+			Do parametersSchema.Properties.SetAt(debugSchema, "debug")
+			Do parametersSchema.Properties.SetAt(internalSchema, "internal")
+			Do userContextSchema.Properties.SetAt(userContextID, "_id")
+			Do parametersSchema.Properties.SetAt(userContextSchema, "userContext")
+			Do schema.Properties.SetAt(parametersSchema, "buildParameters")
+			Set mediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
+			Set mediatype.Schema = schema
+			Do response200.Content.SetAt(mediatype, "application/json")
+			Do buildDocsPath.Get.Responses.SetAt(response200, "200")
+			Do buildDocsPath.Get.Responses.SetAt(response403.%ConstructClone(), "403")
+		}
+
+		Do ..Specification.Paths.SetAt(buildDocsPath, endpoint)
+	}
 }
 
 Method OnResourceInfoRetrieval(stub) [ Internal, Private ]
