@@ -163,7 +163,18 @@ For an example of using `%pkg.isc.rest.model.proxy`, see:
 
 ### Accessing Complex/Intertwined Data
 
-TODO: Talk about dbMappedResource.
+#### %pk.isc.rest.model.resource
+
+To expose data that either cannot be mapped nicely to a single persistent class or in the case that you want to provide a view across several persistent classes.  Extend `%pkg.isc.rest.model.resource`, then must override the RESOURCENAME and most likely should also override CheckPermission as well as the abstract methods.  
+
+For an example of using `pkg.isc.rest.model.resource`, see: 
+[UnitTest.isc.rest.sample.model.person](https://github.com/intersystems/isc-rest/blob/master/internal/testing/unit_tests/UnitTest/isc/rest/sample/model/settings.cls)
+
+
+#### %pkg.isc.rest.model.dbMappedResource
+
+To expose data that maps to a single %Persistent class, involving significant augmentation or cutting of the JSON that would normally be returned in the response if the %Persistent class were extending `%pkg.isc.rest.model.adaptor`, extend `%pkg.isc.rest.model.dbMappedResource` and overwrite the GeModelFromObject method to populate properties.  
+
 
 ### Permissions
 
