@@ -13,6 +13,8 @@
     - [%pkg.isc.rest.model.adaptor](#pkgiscrestmodeladaptor)
     - [%pkg.isc.rest.model.proxy](#pkgiscrestmodelproxy)
   - [Accessing Complex/Intertwined Data](#accessing-complexintertwined-data)
+    - [%pkg.isc.rest.model.resource](#pkgiscrestmodelresource)
+    - [%pkg.isc.rest.model.dbMappedResource](#pkgiscrestmodeldbmappedresource)
   - [Permissions](#permissions)
   - [CRUD and Query Endpoints](#crud-and-query-endpoints)
   - [Actions](#actions)
@@ -163,11 +165,11 @@ For an example of using `%pkg.isc.rest.model.proxy`, see:
 
 ### Accessing Complex/Intertwined Data
 
-#### %pk.isc.rest.model.resource
+#### %pkg.isc.rest.model.resource
 
 To expose data that either cannot be mapped nicely to a single persistent class or in the case that you want to provide a view across several persistent classes.  Extend `%pkg.isc.rest.model.resource`, then must override the RESOURCENAME and most likely should also override CheckPermission as well as the abstract methods.  
 
-For an example of using `pkg.isc.rest.model.resource`, see: 
+For an example of using `%pkg.isc.rest.model.resource`, see: 
 [UnitTest.isc.rest.sample.model.person](https://github.com/intersystems/isc-rest/blob/master/internal/testing/unit_tests/UnitTest/isc/rest/sample/model/settings.cls)
 
 
