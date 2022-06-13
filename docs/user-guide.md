@@ -255,7 +255,7 @@ The following options, as defined in `%pkg.isc.rest.model.action.t.action`, may 
 | Action Attribute | Function |
 | ------- | -------- |
 | name | Required. Name of the action, used in URLs. |
-| target | "class" or "instance." Determins whether the action targets the class or an instance of the class. Defaults to "class". Required if query is not defined. |
+| target | "class" or "instance." Determines whether the action targets the class or an instance of the class. Defaults to "class". Required if query is not defined. |
 | method | The HTTP method to use for the action. Defaults to POST, as this will be most common. | 
 | call | The name of a class/instance method this action should call. May take the format <code>classname:methodname</code> if in a different class. Either *call* or *query* must be defined. |
 | query |  The class query this action should run. May take the form <code>classname:queryname</code> if in a different class. Either *call* or *query* must be defined. |
