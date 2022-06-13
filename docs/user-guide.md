@@ -19,6 +19,7 @@
   - [CRUD and Query Endpoints](#crud-and-query-endpoints)
   - [Actions](#actions)
     - [Action Endpoints](#action-endpoints)
+    - [Defining Actions](#defining-actions)
   - [Defining a Custom Resource](#defining-a-custom-resource)
 - [Controlling Endpoints Exposed](#controlling-endpoints-exposed)
 - [Public API Surface](#public-api-surface)
@@ -236,6 +237,49 @@ NOTE: Studio will help with code completion for XML in this namespace.
 | --------------------- | -------- |
 | GET,PUT,POST,DELETE `/:resource/$:action` | Performs the named action on the specified resource. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
 | GET,PUT,POST,DELETE `/:resource/:id/$:action` | Performs the named action on the specified resource instance. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
+
+### Defining Actions
+
+Within the ActionMap XData block, Actions are defined like this:
+
+```XML
+<actions>
+<action name="my-action" target="class" call="MyMethod">
+	<argument name="myURLparam" target="param" source="query"/>
+</action>
+</actions>
+```
+
+The following options, as defined in `%pkg.isc.rest.model.action.t.action`, may be included as xml attributes for each action:
+
+| Action Attribute | Function |
+| ------- | -------- |
+| name | Required. Name of the action, used in URLs. |
+| target | "class" or "instance." Determines whether the action targets the class or an instance of the class. Defaults to "class". Required if query is not defined. |
+| method | The HTTP method to use for the action. Defaults to POST, as this will be most common. | 
+| call | The name of a class/instance method this action should call. May take the format <code>classname:methodname</code> if in a different class. Either *call* or *query* must be defined. |
+| query |  The class query this action should run. May take the form <code>classname:queryname</code> if in a different class. Either *call* or *query* must be defined. |
+| modelClass | For queries, the model class used to project results returned by the query, if different from the source class. |
+
+Each action may include zero or more ```<argument>``` elements, in order to pass variables to its called method or query, as defined in `%pkg.isc.rest.model.action.t.argument`. Each argument element may include the following options as xml attributes:
+
+| Argument Attribute | Function |
+| ------------------ | -------- |
+| name | Name of the parameter (used in URLs). Required for source types *form-data*, *query*, and *path.* | 
+| required | Is this argument required (if missing, treat as client error). 1 or 0, defaults to 0 |
+| target | Required. Name of target argument in method or query definition. |
+| source | Source from the request to pass to the target argument. Options are: body, body-key, form-data, query, path, id, and user-context.  See table below for further details. |
+
+
+| Argument Source Type | Value Passed to Target Argument |
+| ----------- | -------- |
+| body | The entire body content. Can have AT MOST ONE argument with this source. If the target argument type is an instance of `%pkg.isc.rest.model.resource` or is %JSONENABLED, an instance of that class will be created from the body content before passing it as an argument to the corresponding method or class query for the action. See update-home-address in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| body-key | A single key from a JSON body. | 
+| form-data | Multi-part form data, e.g. processing an uploaded file. | 
+| query  | A query parameter in the URL. See find-by-phone in [isc.sample.rest.phonebook.model.Person](../samples/phonebook/cls/isc/sample/rest/phonebook/model/Person.cls). | 
+| path  | A path parameter from the URL for actions with target = "instance". MUST also be present with a colon in the URL, matching the same name e.g. if the URL path for the action is `/example/:ex`, then the argument name MUST be `ex`. See path-param in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| id  | Resource id from the URL for actions with target = "instance". See update-home-address in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| user-context | Logged-in user as defined by [GetUserResource](#define-a-user-resource) in subclasses of ```%pkg.isc.rest.handler``` |
 
 ### Defining a Custom Resource
 
