@@ -6,7 +6,7 @@ Include (%occErrors, %pkg.isc.rest.openAPI, %pkg.isc.rest.general)
 Class %pkg.isc.rest.handler Extends %CSP.REST [ System = 4 ]
 {
 
-/// Determines what mode queries using this REST handler will be run in.  Defaults to 0 (Logical Mode).\
+/// Determines what mode queries using this REST handler will be run in.  Defaults to 0 (Logical Mode).
 /// Overwrite in a subclass as 1 (ODBC Mode) or 2 (Display Mode).
 Parameter QuerySelectMode As INTEGER = 0;
 
@@ -89,8 +89,20 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 </Routes>
 }
 
+/// Ensures all required parameters are overridden in non-abstract subclasses.
+ClassMethod "%%CheckClassValidity"() [ CodeMode = objectgenerator, GenerateAfter = SupportedVerbs, Internal, Private ]
+{
+	If (%class.Name = "%pkg.isc.rest.handler") {
+		Quit $$$OK
+	}
+	
+	// Require non-abstract CheckResourcePermitted and AuthenticationStrategy methods
+	Set overrides = $ListBuild("m:AuthenticationStrategy","m:CheckResourcePermitted")
+	Return ##class(%pkg.isc.rest.compileTimeCheck).RequireOverrides(overrides,"%pkg.isc.rest.handler")
+}
+
 /// Endpoint call to get the OpenAPI specification saved to disk, and write it to the page as JSON
-ClassMethod GetOpenAPISpecification() As %Status
+ClassMethod GetOpenAPISpecification() As %Status [ Final ]
 {
 	Kill params
 	Merge params = %request.Data
@@ -121,7 +133,7 @@ ClassMethod GetOpenAPISpecification() As %Status
 /// apiPath is the application path of the form "/your/application/"
 /// debug / internal are the same as the query parameters defined in BuildDocumentationEndpoint()
 /// response will be set to the generated OpenAPI specification
-ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, Output response As %pkg.isc.rest.openAPI.model.openAPI, endpointOverride As %String = "") As %Status
+ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, Output response As %pkg.isc.rest.openAPI.model.openAPI, endpointOverride As %String = "") As %Status [ Final ]
 {
 	Try {
 		Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
@@ -166,7 +178,7 @@ ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, O
 }
 
 /// Reports on the status of either the currently building documentation, or the last built documentation
-ClassMethod GetDocumentationBuildStatus() As %Status
+ClassMethod GetDocumentationBuildStatus() As %Status [ Final ]
 {
 	Kill params
 	Merge params = %request.Data
@@ -207,7 +219,7 @@ ClassMethod GetDocumentationBuildStatus() As %Status
 /// Query parameters are:
 ///   debug (defaults to 0): Whether or not to run documentation generators in debug mode
 ///   internal (defaults to 0): Whether or not to generate documentation appropriate for users with source code access
-ClassMethod BuildDocumentationEndpoint() As %Status
+ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 {
 	Kill params
 	Merge params = %request.Data
@@ -254,7 +266,7 @@ ClassMethod BuildDocumentationEndpoint() As %Status
 /// Individual documentation generators should update $$$DocStageBuildDocTypeGbl( typeOfDocumentation) with their individual progress
 /// debug / internal are the same as the query parameters in BuildDocumentationEndpoint()
 /// application is equal to %request.Application
-ClassMethod BuildDocumentationInternal(debug, internal, application, userContextString, userContextID, userContextClass)
+ClassMethod BuildDocumentationInternal(debug, internal, application, userContextString, userContextID, userContextClass) [ Final, Internal ]
 {
 	// Init
 	Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
@@ -373,7 +385,7 @@ ClassMethod CheckSupports(pResourceClass As %Dictionary.CacheClassname, pOperati
 }
 
 /// Checks both strategy- and resource-level permissions
-ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean
+ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean [ Final ]
 {
 	Set strategy = ..AuthenticationStrategy()
 	Set authorized = 1
@@ -385,7 +397,7 @@ ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pI
 }
 
 /// Subclasses must override this to define a custom authentication strategy class.
-ClassMethod AuthenticationStrategy() As %Dictionary.CacheClassname [ Abstract ]
+ClassMethod AuthenticationStrategy() As %Dictionary.Classname [ Abstract ]
 {
 }
 
@@ -424,7 +436,7 @@ ClassMethod OnPreDispatch(pUrl As %String, pMethod As %String, ByRef pContinue A
 	Quit sc
 }
 
-ClassMethod GetUserInfo() As %Status
+ClassMethod GetUserInfo() As %Status [ Final ]
 {
 	#dim %response As %CSP.Response
 	Set userContext = ..GetUserContext()
@@ -437,19 +449,19 @@ ClassMethod GetUserInfo() As %Status
 	Quit $$$OK
 }
 
-ClassMethod GetUserContext() As %pkg.isc.rest.model.resource
+ClassMethod GetUserContext() As %pkg.isc.rest.model.resource [ Final ]
 {
 	$$$ThrowOnError($ClassMethod(..AuthenticationStrategy(),"UserInfo",.userInfo))
 	Quit ..GetUserResource(.userInfo)
 }
 
-ClassMethod LogOut() As %Status
+ClassMethod LogOut() As %Status [ Final ]
 {
 	Quit $ClassMethod(..AuthenticationStrategy(),"Logout")
 }
 
 /// Creates a new instance of the resource (handling a POST request to the resource's endpoint)
-ClassMethod Create(resourceName As %String) As %Status
+ClassMethod Create(resourceName As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationCreate
 
@@ -492,12 +504,12 @@ ClassMethod Create(resourceName As %String) As %Status
 
 /// Wrapper around <method>Supports</method> for the <method>Create</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsCreate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsCreate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationCreate, $$$TypeOperationClass)
 }
 
-ClassMethod CollectionQuery(resourceName As %String) As %Status
+ClassMethod CollectionQuery(resourceName As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationQuery
 
@@ -545,12 +557,12 @@ ClassMethod CollectionQuery(resourceName As %String) As %Status
 
 /// Wrapper around <method>Supports</method> for the <method>CollectionQuery</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsCollectionQuery(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsCollectionQuery(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationQuery, $$$TypeOperationClass)
 }
 
-ClassMethod Retrieve(resourceName As %String, id As %String) As %Status
+ClassMethod Retrieve(resourceName As %String, id As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationRead
 
@@ -581,12 +593,12 @@ ClassMethod Retrieve(resourceName As %String, id As %String) As %Status
 
 /// Wrapper around <method>Supports</method> for the <method>Retrieve</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsRetrieve(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsRetrieve(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationInstance)
 }
 
-ClassMethod Construct(resourceName As %String) As %Status
+ClassMethod Construct(resourceName As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationActionNew
 
@@ -622,13 +634,13 @@ ClassMethod Construct(resourceName As %String) As %Status
 /// Wrapper around <method>Supports</method> for the <method>Construct</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
 /// $$$OperationRead with no ID, or $$$OperationActionNew, is usable as validation for this special case.
-ClassMethod CheckSupportsConstruct(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsConstruct(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationClass) ||
 ..CheckSupports(pResourceClass, $$$OperationActionNew, $$$TypeOperationClass)
 }
 
-ClassMethod Update(resourceName As %String, id As %String) As %Status
+ClassMethod Update(resourceName As %String, id As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationUpdate
 
@@ -666,12 +678,12 @@ ClassMethod Update(resourceName As %String, id As %String) As %Status
 
 /// Wrapper around <method>Supports</method> for the <method>Update</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsUpdate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsUpdate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationUpdate, $$$TypeOperationInstance)
 }
 
-ClassMethod Delete(resourceName As %String, id As %String) As %Status
+ClassMethod Delete(resourceName As %String, id As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationDelete
 
@@ -706,12 +718,12 @@ ClassMethod Delete(resourceName As %String, id As %String) As %Status
 
 /// Wrapper around <method>Supports</method> for the <method>Delete</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDelete(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsDelete(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationDelete, $$$TypeOperationInstance)
 }
 
-ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %Status
+ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationAction(action)
 
@@ -753,12 +765,12 @@ ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %
 
 /// Wrapper around <method>Supports</method> for the <method>DispatchClassAction</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDispatchClassAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsDispatchClassAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationClass)
 }
 
-ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, action As %String) As %Status
+ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, action As %String) As %Status [ Final ]
 {
 	Set operation = $$$OperationAction(action)
 
@@ -801,12 +813,12 @@ ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, actio
 
 /// Wrapper around <method>Supports</method> for the <method>DispatchInstanceAction</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDispatchInstanceAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Internal ]
+ClassMethod CheckSupportsDispatchInstanceAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationInstance)
 }
 
-ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As %String, Output pResourceClass As %Dictionary.CacheClassname) As %Dictionary.CacheClassname [ Private ]
+ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As %String, Output pResourceClass As %Dictionary.CacheClassname) As %Dictionary.CacheClassname [ Final, Private ]
 {
 	#dim %response As %CSP.Response
 	#dim %request As %CSP.Request
@@ -874,19 +886,19 @@ ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As
 	Return ""
 }
 
-ClassMethod FindAcceptedClass(pResource As %String) As %Dictionary.CacheClassname [ Private ]
+ClassMethod FindAcceptedClass(pResource As %String) As %Dictionary.CacheClassname [ Final, Private ]
 {
 	#dim %request As %CSP.Request
-	Quit ..FindClass(..GetMediaTypeListFromAcceptHeader(),pResource,..#HTTP406NOTACCEPTABLE)
+	Quit ..FindClass(..GetMediaTypeListFromAcceptHeader(),pResource,..#HTTP406NOTACCEPTABLE,1)
 }
 
-ClassMethod FindContentClass(pResource As %String) As %Dictionary.CacheClassname [ Private ]
+ClassMethod FindContentClass(pResource As %String) As %Dictionary.CacheClassname [ Final, Private ]
 {
 	#dim %request As %CSP.Request
 	Quit ..FindClass($ListBuild(..GetMediaTypeFromContentType()),pResource,..#HTTP415UNSUPPORTEDMEDIATYPE)
 }
 
-ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pStatusWhenInvalid As %String) As %Dictionary.CacheClassname [ Private ]
+ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pStatusWhenInvalid As %String, pLookForDefault As %Boolean = 0) As %Dictionary.CacheClassname [ Final, Private ]
 {
 	Set pointer = 0
 	Set resourceClass = ""
@@ -903,6 +915,20 @@ ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pSt
 		}
 	}
 	
+	If pLookForDefault && (resourceClass = "") && ##class(%pkg.isc.rest.resourceMap).UniqueDefaultResourceExists($ClassName(),pResource,1,.id) {
+		Set defaultResourceClass = ##class(%pkg.isc.rest.resourceMap).ResourceClassGetStored(id)
+		Set mediaType = ##class(%pkg.isc.rest.resourceMap).MediaTypeGetStored(id)
+		Set orderedTypeList = ..OrderMediaTypeList(pMediaTypeList)
+		While $ListNext(orderedTypeList,pointer,type) {
+			// Convert accepted media type to RegEx
+			Set regEx = $Replace(type,"*",".*")
+			Set regEx = $Replace(regEx,"+","\+")
+			If $Match(mediaType,regEx) {
+				Set resourceClass = defaultResourceClass
+			}
+		}
+	}
+	
 	If (resourceClass = "") {
 		If ('foundJSON) {
 			Do ..ReportHttpStatusCode(pStatusWhenInvalid, $$$ERROR($$$GeneralError,"Only JSON is supported."))
@@ -914,14 +940,30 @@ ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pSt
 	Return resourceClass
 }
 
-ClassMethod GetMediaTypeFromContentType() As %String [ Internal ]
+ClassMethod OrderMediaTypeList(pList As %List) As %List [ Final, Internal ]
+{
+	Set pointer = 0
+	While $ListNext(pList,pointer,item) {
+		Set order = $Length(item,"*")
+		Set array(order,$Increment(array(order))) = item
+	}
+	Set orderedList = ""
+	For order=1:1:3 {
+		For i=1:1:$Get(array(order)) {
+			Set orderedList = orderedList_$ListBuild(array(order,i))
+		}
+	}
+	Quit orderedList
+}
+
+ClassMethod GetMediaTypeFromContentType() As %String [ Final, Internal ]
 {
 	// Strip away charset/boundary: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
 	// Strip away leading and trailing white space
 	Return $ZStrip($Piece(%request.ContentType, ";", 1), "<>W")
 }
 
-ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Internal ]
+ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Final, Internal ]
 {
 	// Order media types based on q-factor:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept

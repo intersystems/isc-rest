@@ -8,24 +8,37 @@ Index ResourceClass On ResourceClass;
 
 Index UniqueByClassnames On (DispatchOrResourceClass, ResourceClass) [ Unique ];
 
+Index UniqueDefaultResource On (DispatchOrResourceClass, ResourceName, IsDefault) [ Data = MediaType, Unique ];
+
 /// Indicate a global for storage difinitions.
 Parameter DEFAULTGLOBAL = "^pkg.isc.rest.resourceMap";
 
 /// Set to null on resource class compilation, or to the dispatch class from the REST handler projection
-Property DispatchClass As %Dictionary.CacheClassname;
+Property DispatchClass As %Dictionary.Classname;
 
 /// Set to either the DispatchClass or the ResourceClass
-Property DispatchOrResourceClass As %Dictionary.CacheClassname [ Calculated, Required, SqlComputeCode = {Set {*} = $Case({DispatchClass},"":{ResourceClass},:{DispatchClass})}, SqlComputed ];
+Property DispatchOrResourceClass As %Dictionary.Classname [ Calculated, Required, SqlComputeCode = {Set {*} = $Case({DispatchClass},"":{ResourceClass},:{DispatchClass})}, SqlComputed ];
 
-Property ResourceName As %String(MAXLEN = 128);
+Property ResourceName As %String(MAXLEN = 128) [ Required ];
 
-Property MediaType As %String(MAXLEN = 128);
+Property MediaType As %String(MAXLEN = 128) [ Required ];
 
-Property ResourceClass As %Dictionary.CacheClassname;
+Property ResourceClass As %Dictionary.Classname [ Required ];
+
+/// Set to 1 if default, NULL if not. (Can only be 1 or null.)
+Property IsDefault As %Integer(MAXVAL = 1, MINVAL = 1);
 
 /// Recursive foreign key references the dispatch class-independent record associated with this one (possibly the current record).
 /// "Cascade" ensures that deletes/updates to the base record are propagated to dispatch class-specific records.
 ForeignKey BaseResourceMap(ResourceClass,ResourceName,MediaType) References %pkg.isc.rest.resourceMap(UniqueByContext) [ OnDelete = cascade, OnUpdate = cascade ];
+
+Trigger ValidateDefaultForHandlers [ Event = INSERT, Foreach = row/object ]
+{
+	New handlerClasses,handlerClass,sc
+	If {DispatchClass} = "" {
+		Do ##class(%pkg.isc.rest.handlerProjection).ValidateDefaultForHandlers({ResourceClass})
+	}
+}
 
 Trigger UpdatePermittedHandlers [ Event = INSERT, Foreach = row/object, Time = AFTER ]
 {
@@ -52,6 +65,9 @@ Storage Default
 </Value>
 <Value name="5">
 <Value>ResourceClass</Value>
+</Value>
+<Value name="6">
+<Value>IsDefault</Value>
 </Value>
 </Data>
 <DataLocation>^pkg.isc.rest.resourceMapD</DataLocation>

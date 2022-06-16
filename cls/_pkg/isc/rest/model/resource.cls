@@ -6,16 +6,26 @@ Class %pkg.isc.rest.model.resource Extends (%RegisteredObject, %pkg.isc.rest.mod
 
 /// Name of the resource at the REST level
 /// Subclasses MUST override this
-/// TODO: Check this is non-abstract in non-abstract subclasses on compilation
 Parameter RESOURCENAME As STRING [ Abstract ];
 
 /// Content-Type implemented in this class
 /// Subclasses MAY override this
-/// TODO: Check this is non-abstract in non-abstract subclasses on compilation
 Parameter MEDIATYPE As STRING = "application/json";
+
+/// Set to 1 to treat this resource as the default for its name. This permit flexible matching on MEDIATYPE for GET requests; e.g.,
+/// given MEDIATYPE=application/json, a GET request for this resource name will match if Accept is set to */* or application/*
+Parameter DEFAULT As BOOLEAN;
 
 /// Maintains data in <class>%pkg.isc.rest.resourceMap</class> for this class.
 Projection ResourceMap As %pkg.isc.rest.model.resourceMapProjection;
+
+/// Ensures all required parameters are overridden in non-abstract subclasses.
+ClassMethod "%%CheckClassValidity"() [ CodeMode = objectgenerator, Internal, Private ]
+{
+	// Require defined RESOURCENAME and MEDIATYPE parameters
+	Set overrides = $ListBuild("p:RESOURCENAME","p:MEDIATYPE")
+	Return ##class(%pkg.isc.rest.compileTimeCheck).RequireOverrides(overrides)
+}
 
 /// Returns an instance of this model, based on the arguments supplied.
 ClassMethod GetModelInstance(args...) As %pkg.isc.rest.model.resource [ Abstract ]

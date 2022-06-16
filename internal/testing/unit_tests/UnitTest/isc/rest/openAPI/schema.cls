@@ -40,7 +40,7 @@ Method TestGetSchema()
 	Do $$$AssertEquals(schema.Items.SourceClasses.Count(), 0, "Schema Items has no source classes set")
 	
 	Do $$$LogMessage("*** Check input: UnitTest.isc.rest.openAPI.schema.transientClass1 collection")
-	Do $$$AssertStatusOK(..SetupClass("UnitTest.isc.rest.openAPI.schema.transientClass1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittes-resource-openapi-schema"}), "Class setup was successful")
+	Do $$$AssertStatusOK(..SetupClass("UnitTest.isc.rest.openAPI.schema.transientClass1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittes-resource-openapi-schema","SOURCECLASS":"UnitTest.isc.rest.openAPI.schema.transientClass1"}), "Class setup was successful")
 	Do $$$AssertStatusOK(..CompileClass("UnitTest.isc.rest.openAPI.schema.transientClass1"), "Class compile was successful")
 	Set openapi = ##class(%pkg.isc.rest.openAPI).%New()
 	Do neededClasses.Clear()

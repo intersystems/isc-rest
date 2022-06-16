@@ -26,7 +26,7 @@ Method OnAfterOneTest() As %Status
 Method TestUserContextPersistentInDB()
 {
 	set sc = ..SetupClass("zUnitTest.isc.rest.handler", ["%pkg.isc.rest.handler"],, "UserContext",,, ,,, , 
-		["AuthenticationStrategy","CheckPermissionHandlerAllowAll:CheckPermission"])
+		["AuthenticationStrategy","CheckResourcePermitted","CheckPermissionHandlerAllowAll:CheckPermission"])
 	Do $$$AssertStatusOK(sc, "REST Handler was set-up correctly")
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.handler"), "REST Handler was compiled correctly")
 	
@@ -47,7 +47,7 @@ Method TestUserContextPersistentInDB()
 Method TestUserContextPersistentNotInDB()
 {
 	set sc = ..SetupClass("zUnitTest.isc.rest.handler", ["%pkg.isc.rest.handler"],, "UserContext",,, ,,, , 
-		["AuthenticationStrategy","CheckPermissionHandlerAllowAll:CheckPermission"])
+		["AuthenticationStrategy","CheckResourcePermitted","CheckPermissionHandlerAllowAll:CheckPermission"])
 	Do $$$AssertStatusOK(sc, "REST Handler was set-up correctly")
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.handler"), "REST Handler was compiled correctly")
 
@@ -66,12 +66,12 @@ Method TestUserContextPersistentNotInDB()
 Method TestUserContextNotPersistent()
 {
 	set sc = ..SetupClass("zUnitTest.isc.rest.handler", ["%pkg.isc.rest.handler"],, "UserContext",,, ,,, , 
-		["AuthenticationStrategy","CheckPermissionHandlerAllowAll:CheckPermission"])
+		["AuthenticationStrategy","CheckResourcePermitted","CheckPermissionHandlerAllowAll:CheckPermission"])
 	Do $$$AssertStatusOK(sc, "REST Handler was set-up correctly")
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.handler"), "REST Handler was compiled correctly")
 
 	// Setup
-	set sc = ..SetupClass("zUnitTest.isc.rest.transientClass1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, "TestProperty")
+	set sc = ..SetupClass("zUnitTest.isc.rest.transientClass1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.transientClass1"}, "TestProperty")
 	Do $$$AssertStatusOK(sc, "Transient serializable class was set-up correctly")
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.transientClass1"), "Transient serializable class was compiled correctly")
 	// Test
@@ -91,6 +91,11 @@ Method TestUserContextNotPersistent()
 ClassMethod AuthenticationStrategy() As %Dictionary.CacheClassname
 {
     Quit ##class(%pkg.isc.rest.authentication.platformBased).%ClassName(1)
+}
+
+ClassMethod CheckResourcePermitted(resourceClass As %Dictionary.Classname) As %Boolean
+{
+	Quit $Piece(resourceClass,".",1,3) = "zUnitTest.isc.rest"
 }
 
 ClassMethod CheckPermissionHandlerAllowAll(pEndpoint As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean

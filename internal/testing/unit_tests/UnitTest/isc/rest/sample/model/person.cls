@@ -13,6 +13,9 @@ Parameter JSONMAPPING As STRING = "LimitedInfo";
 /// Subclasses MUST override this
 Parameter RESOURCENAME As STRING = "person";
 
+/// Set to 1 to treat this resource as the default for its name, to permit flexible matching on Accept header
+Parameter DEFAULT As BOOLEAN = 1;
+
 /// Permits READ and QUERY access only.
 ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext As UnitTest.isc.rest.sample.userContext) As %Boolean
 {

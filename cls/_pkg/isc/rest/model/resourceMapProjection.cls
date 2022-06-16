@@ -42,6 +42,7 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 		Set map.ResourceName = resourceName
 		Set map.MediaType = mediaType
 		Set map.ResourceClass = classname
+		Set map.IsDefault = $Select($Parameter(classname,"DEFAULT"):1,1:"")
 		$$$ThrowOnError(map.%Save())
 	} Catch e {
 		Set sc = e.AsStatus()

@@ -135,7 +135,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		Set msg = $$$FormatText("Action %1: the following arguments are in the path but have no corresponding argument element: %2",..name,$ListToString(missingList))
 		Return $$$ERROR($$$GeneralError,msg)
 	}
-	Return $$$OK
+	Return sc
 }
 
 Method GetDependencies(pSourceClass As %String, ByRef pClassArray)
@@ -336,6 +336,8 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 					$$$GENERATE("	Set args("_position_") = pInstance."_property)
 				}
 			}
+		} ElseIf (argument.source = "user-context") {
+			$$$GENERATE("Merge args("_position_") = pUserContext")
 		}
 	}
 	

@@ -163,7 +163,12 @@ Method TeardownClass(className) As %Boolean
 			Set classActionsName = className_".Actions"
 			&sql(DELETE from %pkg_isc_rest.resourceMap WHERE ResourceClass = :className)
 			&sql(DELETE from %pkg_isc_rest.actionMap WHERE ResourceClass = :className OR ImplementationClass = :classActionsName)
-			Return $system.OBJ.Delete(className, "-d/deleteextent")
+			Set sc = $system.OBJ.Delete(className, "-d/deleteextent")
+			If $$$ISERR(sc) {
+				Return $system.OBJ.Delete(className, "-d")
+			} Else {
+				Return sc
+			}
 		}
 	} Catch ex {
 		Write !, ex.DisplayString()
@@ -172,9 +177,10 @@ Method TeardownClass(className) As %Boolean
 	Return 0
 }
 
-Method CompileClass(className) As %Status
+Method CompileClass(className, Output errorLog) As %Status
 {
-	Return $System.OBJ.Compile(className,"bckry-d")
+	Kill errorLog
+	Return $System.OBJ.Compile(className,"bckry-d",.errorLog)
 }
 
 Method CompileClassList(ByRef classList) As %Status

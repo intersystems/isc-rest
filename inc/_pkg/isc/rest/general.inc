@@ -19,7 +19,7 @@ ROUTINE %pkg.isc.rest.general [Type=INC]
 /// Operation to query a REST resource
 #define OperationQuery              "QUERY"
 /// Operation to perform a custom action with the provided name on a REST resource
-#define OperationAction(%action)    "ACTION:"_%action
+#define OperationAction(%action)    ("ACTION:"_%action)
 /// Operation to perform the special "new" action on a REST resource
 #define OperationActionNew          $$$OperationAction("new")
 
