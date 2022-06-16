@@ -402,12 +402,12 @@ Method TestGenerationWithSharedResourceName()
 	Set openapi.IncludeForbiddenEndpoints = 0
 	
 	// Class setup
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.1+json"}, "property1",,, ,,, , ["CheckPermission1:CheckPermission"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.2+json"}, "property2",,, ,,, , ["CheckPermission2:CheckPermission"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class3", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, ,,, ,,, ["ActionMap1:ActionMap"], ["CheckPermission3:CheckPermission"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class4", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.4+json"}, "property3",,, ,,, , ["CheckPermission1:CheckPermission"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class5", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.5+json"}, "property3",,, ,,, , ["CheckPermission1:CheckPermission"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class6", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.6+json"}, ,,, ,,, ["ActionMap2:ActionMap"], ["CheckPermission1:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.1+json"}, "property1",,, ,,, , ["CheckPermission1:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class2","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.2+json"}, "property2",,, ,,, , ["CheckPermission2:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class3", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class3"}, ,,, ,,, ["ActionMap1:ActionMap"], ["CheckPermission3:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class4", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class4","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.4+json"}, "property3",,, ,,, , ["CheckPermission1:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class5", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class5","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.5+json"}, "property3",,, ,,, , ["CheckPermission1:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class6", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class6","MEDIATYPE":"application/vnd.intersystems.apps.unittest.resource.6+json"}, ,,, ,,, ["ActionMap2:ActionMap"], ["CheckPermission1:CheckPermission"]))
 	
 	// Class compilation
 	// As of now, only supported HTTP verbs in ActionMap:
@@ -550,7 +550,7 @@ Method TestSpecModificationMethods()
 	
 	// Resource class setup
 	// Use the poorly-typed setup from TestUndesiredArgumentsAndReturnTypesHandling() -- make sure the warnings are not present after being fixed using ModifyOpenAPISpecification
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, ,,, ,,, ["PoorlyTypedMethodsActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission","PoorlyTypedMethod1","PoorlyTypedMethod2","PoorlyTypedMethod3","ModifyOpenAPIInfoSpecModification:ModifyOpenAPIInfo"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, ["PoorlyTypedMethodsActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission","PoorlyTypedMethod1","PoorlyTypedMethod2","PoorlyTypedMethod3","ModifyOpenAPIInfoSpecModification:ModifyOpenAPIInfo"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	
 	Do $$$AssertTrue(openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation completed without errors")
@@ -801,7 +801,7 @@ Method TestInvalidJSONMapping()
 	Set openapi.DEBUG = 0
 	
 	// Resource class setup
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource", "JSONMAPPING":"NonexistentJSONMapping"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource", "SOURCECLASS":"zUnitTest.isc.rest.class1", "JSONMAPPING":"NonexistentJSONMapping"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
 	
 	// Class compilation
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
@@ -844,7 +844,7 @@ Method TestIncompatibleMediatypes()
 	Set openapi.DEBUG = 0
 	
 	// Resource class setup
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","MEDIATYPE":"image/png"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1","MEDIATYPE":"image/png"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
 	
 	// Class compilation
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
@@ -887,7 +887,7 @@ Method TestHideInternalInfoFlag()
 	Set openapi.HideInternalInfo = 1
 	
 	// Resource class setup
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, "TestProp", {"Type":"zUnitTest.isc.rest.class1"}, {"%JSONFIELDNAME":"testField"}, ,,, ["IntegerIdentityActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission","IntegerIdentity"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, "TestProp", {"Type":"zUnitTest.isc.rest.class1"}, {"%JSONFIELDNAME":"testField"}, ,,, ["IntegerIdentityActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission","IntegerIdentity"]))
 	
 	// Class compilation
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
@@ -919,13 +919,13 @@ Method TestIncludeForbiddenEndpointsFlag()
 	
 	// Resource class setup
 	// Behavior should differ when an invalid MEDIATYPE is defined on a resource, leading success responses to not be generated
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-1","MEDIATYPE":"image/png"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-1","SOURCECLASS":"zUnitTest.isc.rest.class1","MEDIATYPE":"image/png"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
 	// Behavior should differ when invalid methods are referenced, leading to success response removal
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-2"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-2","SOURCECLASS":"zUnitTest.isc.rest.class2"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
 	// Behavior should differ when endpoints have no reachable success response due to the CheckPermission() method
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class3", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-3"}, ,,, ,,, , ["CheckPermissionDenyAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class3", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-3","SOURCECLASS":"zUnitTest.isc.rest.class3"}, ,,, ,,, , ["CheckPermissionDenyAll:CheckPermission"]))
 	// Behavior should differ when endpoints have no reachable success response due to the ModifyOpenAPIInfo() method (ONLY when the endpoint has not been completely removed)
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class4", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission", "ModifyOpenAPIInfoRemoveQuery200Response:ModifyOpenAPIInfo"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class4", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class4"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission", "ModifyOpenAPIInfoRemoveQuery200Response:ModifyOpenAPIInfo"]))
 	
 	// Class compilation
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
@@ -975,7 +975,7 @@ Method TestNonexistantMethod()
 	Set openapi.DEBUG = 0
 	Set openapi.ForceAuthorizeAllEndpoints = 1
 	Set openapi.IncludeForbiddenEndpoints = 1
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	Do $$$AssertTrue('openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation did NOT complete without errors")
 	Set spec = openapi.Specification
@@ -1010,8 +1010,8 @@ Method TestUndesiredArgumentAndReturnTypesHandling()
 	Set openapi.IncludeForbiddenEndpoints = 1
 	set st = ..SetupClass(
 		"zUnitTest.isc.rest.class1", 
-		["%pkg.isc.rest.model.dbMappedResource"], 
-		{"RESOURCENAME":"unittest-resource"}, ,,, ,,, 
+		["%Persistent","%pkg.isc.rest.model.dbMappedResource"], 
+		{"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, 
 		["PoorlyTypedMethodsActionMap:ActionMap"], 
 		["CheckPermissionAllowAll:CheckPermission","PoorlyTypedMethod1","PoorlyTypedMethod2","PoorlyTypedMethod3"]
 	)
@@ -1091,8 +1091,8 @@ Method TestGetAllParametersFromSpec()
 	Set openapi.IncludeForbiddenEndpoints = 1
 	set st = ..SetupClass(
 		"zUnitTest.isc.rest.class1", 
-		["%pkg.isc.rest.model.dbMappedResource"], 
-		{"RESOURCENAME":"unittest-resource"}, ,,, ,,, 
+		["%Persistent","%pkg.isc.rest.model.dbMappedResource"], 
+		{"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, 
 		["PoorlyTypedMethodsActionMap:ActionMap"], 
 		["CheckPermissionAllowAll:CheckPermission","PoorlyTypedMethod1","PoorlyTypedMethod2","PoorlyTypedMethod3"]
 	)
@@ -1122,8 +1122,8 @@ Method TestGetAllSchemaRefsFromSpec()
 	Set openapi.IncludeForbiddenEndpoints = 1
 	set st = ..SetupClass(
 		"zUnitTest.isc.rest.class1", 
-		["%pkg.isc.rest.model.dbMappedResource"], 
-		{"RESOURCENAME":"unittest-resource"}, ,,, ,,, 
+		["%Persistent","%pkg.isc.rest.model.dbMappedResource"], 
+		{"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, 
 		["PoorlyTypedMethodsActionMap:ActionMap"], 
 		["CheckPermissionAllowAll:CheckPermission","PoorlyTypedMethod1","PoorlyTypedMethod2","PoorlyTypedMethod3"]
 	)
@@ -1149,7 +1149,7 @@ Method TestSchemaAutogenerationTagging()
 	Set openapi = ..SetupTestingEnvironment()
 	#Dim openapi As %pkg.isc.rest.openAPI
 	Set openapi.DEBUG = 0
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, "TestProp",,, ,,, ["ActionMap1:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, "TestProp",,, ,,, ["ActionMap1:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	Do $$$AssertTrue(openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation completed without errors")
 	Set spec = openapi.Specification
@@ -1171,7 +1171,7 @@ Method TestNoSecurityDefinedWarning()
 	Set openapi = ..SetupTestingEnvironment()
 	#Dim openapi As %pkg.isc.rest.openAPI
 	Set openapi.DEBUG = 0
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	Do $$$AssertTrue(openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation completed without errors")
 	Do $$$AssertTrue(openapi.Specification.Warnings.Count() > 0, "At least one warning was logged")
@@ -1196,8 +1196,8 @@ Method TestCollectionQueryOverride()
 	Set openapi = ..SetupTestingEnvironment()
 	#Dim openapi As %pkg.isc.rest.openAPI
 	Set openapi.DEBUG = 0
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission","GetCollectionCustom:GetCollection"]))
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-1"}, "TestClassProperty", {"Required":1},, ,,, , ["CheckPermissionAllowAll:CheckPermission","GetCollectionNonArray:GetCollection"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission","GetCollectionCustom:GetCollection"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-1","SOURCECLASS":"zUnitTest.isc.rest.class2"}, "TestClassProperty", {"Required":1},, ,,, , ["CheckPermissionAllowAll:CheckPermission","GetCollectionNonArray:GetCollection"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class2"))
 	Do $$$AssertTrue(openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation completed without errors")
@@ -1285,7 +1285,7 @@ Method TestMultiHandlers()
 	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.handler2", ["%pkg.isc.rest.handler"],, ,,, ,,, , ["AuthenticationStrategy","CheckResourcePermitted"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.handler2"))
 	
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource"}, "TestProp",,, ,,, ["ActionMap1:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, "TestProp",,, ,,, ["ActionMap1:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
 	
 	New %restHandlerOverride

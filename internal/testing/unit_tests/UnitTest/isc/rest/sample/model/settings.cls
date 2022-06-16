@@ -54,6 +54,21 @@ Method SaveModelInstance(pUserContext As %RegisteredObject)
     $$$ThrowOnError(sc)
 }
 
+/// Defines a mapping of actions available for this model class to the associated methods and arguments.
+XData ActionMap [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/action" ]
+{
+<actions>
+<action name="expanded-user-info" method="GET" target="class" call="GetUserExpandedInfo">
+<argument source="user-context" target="pUserContext" />
+</action>
+</actions>
+}
+
+ClassMethod GetUserExpandedInfo(pUserContext As UnitTest.isc.rest.sample.userContext) As %DynamicObject
+{
+	Quit {"UsernameUpper":($ZConvert(pUserContext.Username,"U"))}
+}
+
 /// Checks if the particular operation is supported for this resource. <br />
 /// Look at documentation of <method>SupportsDefault</method> for default behavior
 /// of this method. <br />
@@ -71,7 +86,7 @@ Method SaveModelInstance(pUserContext As %RegisteredObject)
 ClassMethod Supports(pOperation As %String, pType As %String(VALUELIST=",instance,class"), pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
 {
     // Only support GET and POST with no path or query parameters
-    If (pType = "class") && ((pOperation = $$$OperationCreate) || (pOperation = $$$OperationQuery)) {
+    If (pType = "class") && ((pOperation = $$$OperationCreate) || (pOperation = $$$OperationQuery) || (pOperation = $$$OperationAction("expanded-user-info"))) {
         Return 1
     }
 	Return 0

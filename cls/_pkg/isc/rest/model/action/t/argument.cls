@@ -34,8 +34,11 @@ Property name As %String(XMLPROJECTION = "attribute");
 ///     <li>
 ///         id: The ID from the path for instance actions.
 ///     </li>
+///     <li>
+///         user-context: the user context object, as provided by the subclass of <class>%pkg.isc.rest.handler</class> in use
+///     </li>
 /// </ul>
-Property source As %String(VALUELIST = ",body,body-key,form-data,query,path,id", XMLPROJECTION = "attribute") [ InitialExpression = "query", Required ];
+Property source As %String(VALUELIST = ",body,body-key,form-data,query,path,id,user-context", XMLPROJECTION = "attribute") [ InitialExpression = "query", Required ];
 
 /// Target parameter in the method/query
 Property target As %String(XMLPROJECTION = "attribute") [ Required ];
@@ -49,7 +52,7 @@ Property required As %Boolean(XMLPROJECTION = "attribute") [ InitialExpression =
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
-    Set sourcesWithNameNotRequired = $ListBuild("body", "body-key", "id")
+    Set sourcesWithNameNotRequired = $ListBuild("body", "body-key", "id", "user-context")
 	If '$ListFind(sourcesWithNameNotRequired, ..source) && (..name = "") {
         Set msg = "MUST have 'name' attribute set on argument unless source is one of "_$ListToString(sourcesWithNameNotRequired)
         Return $$$ERROR($$$GeneralError,msg)

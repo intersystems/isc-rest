@@ -38,25 +38,25 @@ ClassMethod DeleteModelInstance(pID As %String) As %Boolean
 
 /// JSONImport imports JSON or dynamic object input into this object.<br />
 /// The input argument is either JSON as a string or stream, or a subclass of %DynamicAbstractObject.
-Method JSONImport(input) As %Status
+Method JSONImport(input) As %Status [ Final ]
 {
 	Quit ..%instance.%JSONImport(.input, ..#JSONMAPPING)
 }
 
 /// Serialize a JSON enabled class as a JSON document and write it to the current device.
-Method JSONExport() As %Status
+Method JSONExport() As %Status [ Final ]
 {
 	Quit ..%instance.%JSONExport(..#JSONMAPPING)
 }
 
 /// Serialize a JSON enabled class as a JSON document and write it to a stream.
-Method JSONExportToStream(ByRef export As %Stream.Object) As %Status
+Method JSONExportToStream(ByRef export As %Stream.Object) As %Status [ Final ]
 {
 	Quit ..%instance.%JSONExportToStream(.export, ..#JSONMAPPING)
 }
 
 /// Serialize a JSON enabled class as a JSON document and return it as a string.
-Method JSONExportToString(ByRef %export As %String) As %Status
+Method JSONExportToString(ByRef %export As %String) As %Status [ Final ]
 {
 	Quit ..%instance.%JSONExportToString(.%export, ..#JSONMAPPING)
 }

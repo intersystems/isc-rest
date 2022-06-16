@@ -20,8 +20,16 @@ Parameter IndexToUse As STRING = "ID";
 /// If true, <method>GetModelFromResultRow</method> must be overridden and implemented.
 Parameter ConstructFromResultRow As BOOLEAN = 0;
 
+/// Ensures all required parameters are overridden in non-abstract subclasses.
+ClassMethod "%%CheckClassValidity"() [ CodeMode = objectgenerator, Internal, Private ]
+{
+	// Require defined RESOURCENAME and MEDIATYPE parameters
+	Set overrides = $ListBuild("p:RESOURCENAME","p:MEDIATYPE","p:SOURCECLASS")
+	Return ##class(%pkg.isc.rest.compileTimeCheck).RequireOverrides(overrides)
+}
+
 /// Returns an existing instance of this model, based on the identifier <var>index</var>, or a new instance if <var>index</var> is not supplied.
-ClassMethod GetModelInstance(index As %String) As %pkg.isc.rest.model.dbMappedResource
+ClassMethod GetModelInstance(index As %String) As %pkg.isc.rest.model.dbMappedResource [ Final ]
 {
 	// We might want to pass in an entire row (an object) instead of just an index to look up
 	// If that happens, use this method instead
@@ -80,7 +88,6 @@ ClassMethod DeleteModelInstance(pID As %String) As %Boolean [ Abstract ]
 /// building and running a query, and then printing out the result set in a json format.
 ClassMethod GetCollection(ByRef URLParams, selectMode As %Integer = 0)
 {
-	
 	set resultSet = ..ConstructAndRunQuery(.URLParams, selectMode)
     write "["
 
@@ -99,7 +106,7 @@ ClassMethod GetCollection(ByRef URLParams, selectMode As %Integer = 0)
     Write "]"
 }
 
-ClassMethod ConstructAndRunQuery(ByRef URLParams, selectMode As %Integer = 0) [ Internal, Private ]
+ClassMethod ConstructAndRunQuery(ByRef URLParams, selectMode As %Integer = 0) [ Final, Internal, Private ]
 {
 	Set query = ##class(%pkg.isc.rest.queryGenerator).GetQuery(..#SOURCECLASS, ..GetProxyColumnList(), ..#IndexToUse, .URLParams, .queryParams)
 	
@@ -142,7 +149,7 @@ Method JSONExportToString(ByRef %export As %String) As %Status
 }
 
 /// Subclasses should not need to override this method. Instead, implement <method>OnGetProxyColumnList</method>.
-ClassMethod GetProxyColumnList() As %DynamicObject [ CodeMode = objectgenerator, Internal ]
+ClassMethod GetProxyColumnList() As %DynamicObject [ CodeMode = objectgenerator, Final, Internal ]
 {
 	Set sc = $$$OK
 	Try {

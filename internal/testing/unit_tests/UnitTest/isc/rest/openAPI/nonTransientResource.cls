@@ -1,4 +1,4 @@
-Class UnitTest.isc.rest.openAPI.nonTransientResource Extends (%Persistent, %pkg.isc.rest.model.dbMappedResource)
+Class UnitTest.isc.rest.openAPI.nonTransientResource Extends (%Persistent, %pkg.isc.rest.model.adaptor)
 {
 
 Parameter RESOURCENAME = "unittest-isc-rest-openapi-nontransient-resource";

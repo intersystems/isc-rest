@@ -39,6 +39,36 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 	Quit sc
 }
 
+/// Called from trigger in resourceMap
+ClassMethod ValidateDefaultForHandlers(resourceClass As %Dictionary.Classname)
+{
+	Set validSC = $$$OK
+	Set handlerClasses = ##class(%Dictionary.ClassDefinition).SubclassOfFunc("%pkg.isc.rest.handler")
+	While handlerClasses.%Next(.sc) {
+		$$$ThrowOnError(sc)
+		Set handlerClass = handlerClasses.Name
+		If $$$comClassKeyGet(handlerClass,$$$cCLASSabstract) {
+			Continue
+		}
+		Try {
+			If $System.CLS.IsMthd(handlerClass, "CheckResourcePermitted") && $classmethod(handlerClass, "CheckResourcePermitted", resourceClass) {
+				Set resourceName = $Parameter(resourceClass,"RESOURCENAME")
+				If ##class(%pkg.isc.rest.resourceMap).UniqueDefaultResourceExists(handlerClass, resourceName, 1, .id) {
+					Set existingClass = ##class(%pkg.isc.rest.resourceMap).ResourceClassGetStored(id)
+					If existingClass '= resourceClass {
+						Set msg = $$$FormatText("%1 is already registered as the default resource for name %2 in dispatch class %3", existingClass, resourceName, handlerClass)
+						$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
+					}
+				}
+			}
+		} Catch e {
+			set validSC = $$$ADDSC(validSC,e.AsStatus())
+		}
+	}
+	$$$ThrowOnError(sc)
+	$$$ThrowOnError(validSC)
+}
+
 /// Called from triggers in actionMap and resourceMap
 ClassMethod AddResourceWherePermitted(resourceClass As %Dictionary.Classname)
 {
@@ -80,6 +110,7 @@ ClassMethod AddPermittedClass(handlerClass As %Dictionary.Classname, resourceCla
 	Set target.ResourceClass = resourceClass
 	Set target.MediaType = source.MediaType
 	Set target.ResourceName = source.ResourceName
+	Set target.IsDefault = source.IsDefault
 	$$$ThrowOnError(target.%Save())
 	
 	// Insert/update actionMap (update should always be a no-op)

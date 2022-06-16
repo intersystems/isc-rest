@@ -65,11 +65,36 @@ Method TestPerson01Query()
     }
 }
 
+Method TestPerson011QueryDefault()
+{
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "*/*"
+    Set request.Data("$orderBy", 1) = "name"
+    Do ..Request("GET", "person", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+    If '$$$AssertEquals(object.%Size(), 200) {
+        Do $$$LogMessage("Response Size: "_object.%Size)
+    }
+}
+
 Method TestPerson02Get()
 {
     #dim request As %CSP.Request
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
+    Do ..Request("GET", "person/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+    Set ..Person = object
+}
+
+Method TestPerson021GetDefault()
+{
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/*"
     Do ..Request("GET", "person/1", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
     Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
@@ -278,6 +303,17 @@ Method TestVendor6Construct()
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
     Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.data.vendor).#MEDIATYPE)
     Do $$$AssertEquals(object.%Size(),1)
+}
+
+Method TestSettings1UserExpandedInfo()
+{
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
+    Do ..Request("GET", "settings/$expanded-user-info", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, "application/json")
+    Do $$$AssertEquals(object.UsernameUpper,$ZConvert($Username,"U"))
 }
 
 Method TestBad01InvalidOrderBy()
@@ -520,6 +556,17 @@ Method TestSupportsResourceOverridden()
     Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
     Do ..Request("GET", "settings/$new", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+}
+
+Method TestOrderMediaTypeList()
+{
+	#define order(%arg) ##class(%pkg.isc.rest.handler).OrderMediaTypeList(%arg)
+	Do $$$LogMessage("Note: $$$order(%arg) is ##class(%pkg.isc.rest.handler).OrderMediaTypeList(%arg)")
+	Do $$$AssertEquals($$$order($lb("application/foo+bar.json","*/*")),$lb("application/foo+bar.json","*/*"))
+	Do $$$AssertEquals($$$order($lb("*/*","application/foo+bar.json")),$lb("application/foo+bar.json","*/*"))
+	Do $$$AssertEquals($$$order($lb("application/*","application/foo+bar.json")),$lb("application/foo+bar.json","application/*"))
+	Do $$$AssertEquals($$$order($lb("*/*","application/*")),$lb("application/*","*/*"))
+	Do $$$AssertEquals($$$order($lb("application/foo+bar.json","*/*","application/json")),$lb("application/foo+bar.json","application/json","*/*"))
 }
 
 }
