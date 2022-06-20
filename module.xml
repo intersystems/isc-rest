@@ -1,20 +1,19 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Export generator="IRIS" version="26">
+<?xml version="1.0" encoding="UTF-8"?><Export generator="IRIS" version="26">
 <Document name="isc.rest.ZPM">
     <Module>
       <Name>isc.rest</Name>
-      <Version>1.0.0+snapshot</Version>
+      <Version>1.1.0+snapshot</Version>
       <Packaging>module</Packaging>
       <Dependencies>
         <ModuleReference>
           <Name>isc.json</Name>
-          <Version>^1.0.0</Version>
+          <Version>^2.0.0</Version>
         </ModuleReference>
       </Dependencies>
       <Resources><Resource Name="pkg.isc.rest.lifecycle.CLS" Preload="true" />
-        <Resource Name="%pkg.isc.rest.PKG"></Resource>
-        <Resource Name="%pkg.isc.rest.openAPI.INC"></Resource>
-        <Resource Name="%pkg.isc.rest.general.INC"></Resource>
+        <Resource Name="%pkg.isc.rest.PKG"/>
+        <Resource Name="%pkg.isc.rest.openAPI.INC"/>
+        <Resource Name="%pkg.isc.rest.general.INC"/>
         <Resource Name="/internal/testing/unit_tests/">
           <Attribute Name="Package">UnitTest.isc.rest</Attribute>
         </Resource>
