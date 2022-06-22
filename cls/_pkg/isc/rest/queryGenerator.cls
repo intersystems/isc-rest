@@ -44,6 +44,11 @@ ClassMethod BuildQuery(tableName As %String, columns As %DynamicObject, index As
 	Set propName = $Order(params(""))
 	While (propName '= "") {
 		Set param = params(propName, 1)
+		// ignore debug signal
+		If (propName = "CSPDEBUG") {
+			Set propName = $Order(params(propName))
+			Continue
+		}
 		// if the property is $orderBy, then we store the order by string
 		// for appending at the end of the where clause building
 		If (propName = "$orderBy") {
