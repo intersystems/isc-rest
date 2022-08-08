@@ -43,11 +43,13 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 	}
 	
 	If (..query '= "") {
-		If (..method = "POST") {
+		// query
+		If (..method '= "GET") {
 			Set msg = $$$FormatText("Action %1: must use GET method with a query.",..name)
 			Return $$$ERROR($$$GeneralError,msg)
 		}
 	} Else {
+		// call
 		If (..modelClass '= "") {
 			Set msg = $$$FormatText("Action %1: modelClass may only be defined for query actions",..name)
 			Return $$$ERROR($$$GeneralError,msg)
@@ -341,13 +343,14 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 		}
 	}
 	
+	Set resultVariableName = "result"
 	If (..query '= "") {
-		Set methodCall = "set result = ##class(%pkg.isc.rest.model.queryResult).FromClassQuery("_$$$QUOTE(tResultClass)_","_$$$QUOTE(class)_","_$$$QUOTE(method)_",args...)"
+		Set methodCall = "Set "_resultVariableName_" = ##class(%pkg.isc.rest.model.queryResult).FromClassQuery("_$$$QUOTE(tResultClass)_","_$$$QUOTE(class)_","_$$$QUOTE(method)_",args...)"
 	} Else {
 		If (returnType = "") {
 			Set methodCall = "Do "
 		} Else {
-			Set methodCall = "Set result = "
+			Set methodCall = "Set "_resultVariableName_" = "
 		}
 		Set methodCall = methodCall_$Case(..target,
 			"instance":"pInstance.",
@@ -355,38 +358,98 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 	}
 	$$$GENERATE(methodCall)
 	If (returnType = "%Library.Status") {
-		$$$GENERATE("$$$ThrowOnError(result)")
+		$$$GENERATE("$$$ThrowOnError("_resultVariableName_")")
 	} ElseIf (returnType '= "") {
-		If $ClassMethod(returnType,"%Extends","%Library.DynamicAbstractObject") {
-			Set pResultContentType = "application/json"
-			Set exportCommand = "Write result.%ToJSON()"
-		} ElseIf $ClassMethod(returnType,"%Extends","%pkg.isc.rest.model.resource") {
-			Set pResultContentType = $Parameter(returnType,"MEDIATYPE")
-			Set exportCommand = "Do result.JSONExport()"
-		} ElseIf $ClassMethod(returnType,"%Extends","%pkg.isc.rest.model.queryResult") {
-			Set pResultContentType = $Parameter(tResultClass,"MEDIATYPE")
-			Set exportCommand = "$$$ThrowOnError(result.JSONExport())"
-		}ElseIf $ClassMethod(returnType,"%Extends","%Stream.Object") {
-			Set pResultContentType = "application/octet-stream"
-			Set exportCommand = "Do result.OutputToDevice()"
-		} ElseIf $Parameter(returnType,"%JSONENABLED") {
-			Set pResultContentType = "application/json"
-			Set exportCommand = "Do result.%JSONExport()"
-		} Else {
-			$$$GENERATE("// Unknown handling for return type: "_returnType)
-			$$$GENERATE("Set %response.Status = "_$$$QUOTE(##class(%CSP.REST).#HTTP204NOCONTENT))
-			Quit
+		Set exportCommandList = ..ComputeExportCommandList(
+			resultVariableName, returnType, tResultClass, .pResultContentType
+		)
+		If (pResultContentType '= "") {
+			$$$GENERATE("Set %response.ContentType = "_$$$QUOTE(pResultContentType))
 		}
-		$$$GENERATE("Set %response.ContentType = "_$$$QUOTE(pResultContentType))
-		$$$GENERATE("If $IsObject(result) {")
-		$$$GENERATE("	"_exportCommand)
+		$$$GENERATE("If $Data("_resultVariableName_") {")
+		Set ptr = 0
+		While $ListNext(exportCommandList,ptr,exportCommand) {
+			$$$GENERATE("	"_exportCommand)
+		}
 		$$$GENERATE("} Else {")
 		$$$GENERATE("	Set %response.Status = "_$$$QUOTE(##class(%CSP.REST).#HTTP204NOCONTENT))
 		$$$GENERATE("}")
 	}
 }
 
-Method GetFormalSpecMap(ByRef pModelClass As %String, Output pClass, Output pMethod, Output pArgArray, Output pNameMap, Output pReturnType)
+Method ComputeExportCommandList(pResultVariableName As %String, pReturnType As %Dictionary.Classname, pResultClass As %Dictionary.Classname, Output pResultContentType As %String) As %Library.List [ Internal ]
+{
+	Set pResultContentType = ""
+	Set exportCommandList = ""
+	Set classType = $$$comClassKeyGet(pReturnType,$$$cCLASSclasstype)
+	Set unknownReturnTypeError = "Unknown handling for return type: " _ $$$QUOTE(pReturnType) _ " for action " _ $$$QUOTE(..name)
+	If (classType = $$$cCLASSCLASSTYPEDATATYPE) {
+		// Data types
+		If (pReturnType = "%Library.List") {
+			// Specific handling for $ListBuild as a dynamic array
+			Set pResultContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
+			Set exportCommandList = $ListBuild(
+				"Set jsonResult = []",
+				"Set ptr = 0",
+				"While $ListNext("_pResultVariableName_",ptr,value) {",
+				"  Do jsonResult.%Push(value)",
+				"}",
+				"Do "_pResultVariableName_".%ToJSON()"
+			)
+		} Else {
+			// All other data types are simple text to write out
+			Set pResultContentType = ##class(%CSP.REST).#CONTENTTYPETEXT
+			Set exportCommandList = $ListBuild("Write "_pResultVariableName)
+		}
+	} Else {
+		If $System.CLS.IsMthd(pReturnType, "%Extends") {
+			If $ClassMethod(pReturnType, "%Extends", "%Collection.AbstractList") {
+				// Lists
+				$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))
+			} ElseIf $ClassMethod(pReturnType, "%Extends", "%Collection.AbstractArray") {
+				// Arrays
+				$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))
+			} Else {
+				// Singular Objects i.e. not collections
+				If $ClassMethod(pReturnType,"%Extends","%Library.DynamicAbstractObject") {
+					Set pResultContentType = "application/json"
+					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%ToJSON()")
+				} ElseIf $ClassMethod(pReturnType,"%Extends","%pkg.isc.rest.model.resource") {
+					Set pResultContentType = $Parameter(pReturnType,"MEDIATYPE")
+					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".JSONExport()")
+				} ElseIf $ClassMethod(pReturnType,"%Extends","%pkg.isc.rest.model.queryResult") {
+					Set pResultContentType = $Parameter(pResultClass,"MEDIATYPE")
+					Set exportCommandList = $ListBuild("$$$ThrowOnError("_pResultVariableName_".JSONExport())")
+				} ElseIf $ClassMethod(pReturnType,"%Extends","%CSP.Stream") {
+					// MUST be before %Stream.Object as this is a special case of that
+					Set pResultContentType = ""
+					Set exportCommandList = $ListBuild(
+						"Set %response.ContentType = "_pResultVariableName_".ContentType",
+						"Do "_pResultVariableName_".OutputToDevice()"
+					)
+				} ElseIf $ClassMethod(pReturnType,"%Extends","%Stream.Object") {
+					Set pResultContentType = "application/octet-stream"
+					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".OutputToDevice()")
+				} ElseIf $Parameter(pReturnType,"%JSONENABLED") {
+					Set pResultContentType = "application/json"
+					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%JSONExport()")
+				} Else {
+					$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))
+				}
+			}
+		} Else {
+			If $Parameter(pReturnType,"%JSONENABLED") {
+				Set pResultContentType = "application/json"
+				Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%JSONExport()")
+			} Else {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))
+			}
+		}
+	}
+	Return exportCommandList
+}
+
+Method GetFormalSpecMap(ByRef pModelClass As %String, Output pClass As %Dictionary.Classname, Output pMethod As %Dictionary.Identifier, Output pArgArray, Output pNameMap, Output pReturnType As %Dictionary.Classname) [ Internal ]
 {
 	Kill pClass,pMethod,pArgArray,pNameMap,returnType
 	
@@ -398,6 +461,10 @@ Method GetFormalSpecMap(ByRef pModelClass As %String, Output pClass, Output pMet
 		} Else {
 			Set pClass = pModelClass
 			Set pMethod = ..query
+		}
+		If '$$$comMemberDefined(pClass,$$$cCLASSquery,pMethod) {
+			Set msg = $$$FormatText("Query '%1' is missing in class '%2' but expected as part of action '%3'",pMethod,pClass,..name)
+			$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
 		}
 		
 		Set formalspec = $$$comMemberKeyGet(pClass,$$$cCLASSquery,pMethod,$$$cQUERYformalspecparsed)
@@ -418,6 +485,11 @@ Method GetFormalSpecMap(ByRef pModelClass As %String, Output pClass, Output pMet
 		} Else {
 			Set pClass = pModelClass
 			Set pMethod = ..call
+		}
+
+		If '$$$comMemberDefined(pClass,$$$cCLASSmethod,pMethod) {
+			Set msg = $$$FormatText("Method '%1' is missing in class '%2' but expected as part of action '%3'",pMethod,pClass,..name)
+			$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
 		}
 		
 		Set formalspec = $$$comMemberKeyGet(pClass,$$$cCLASSmethod,pMethod,$$$cMETHformalspecparsed)

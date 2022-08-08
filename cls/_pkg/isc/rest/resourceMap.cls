@@ -35,7 +35,7 @@ ForeignKey BaseResourceMap(ResourceClass,ResourceName,MediaType) References %pkg
 Trigger ValidateDefaultForHandlers [ Event = INSERT, Foreach = row/object ]
 {
 	New handlerClasses,handlerClass,sc
-	If {DispatchClass} = "" {
+	If ({DispatchClass} = "") && ({IsDefault}) {
 		Do ##class(%pkg.isc.rest.handlerProjection).ValidateDefaultForHandlers({ResourceClass})
 	}
 }
@@ -79,4 +79,3 @@ Storage Default
 }
 
 }
-

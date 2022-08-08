@@ -1,11 +1,11 @@
-Class UnitTest.isc.rest.openAPI.userContextPassing Extends UnitTest.isc.rest.openAPI.testCase
+Class UnitTest.isc.rest.openAPI.userContextPassing Extends UnitTest.isc.rest.testCase
 {
 
 Method OnBeforeOneTest() As %Status
 {
 	kill ^pkg.isc.rest.documentation.parameters
 	Kill ^pkg.isc.rest.documentation.stage
-	return $$$OK
+	return ##super()
 }
 
 Method OnAfterOneTest() As %Status

@@ -1,27 +1,11 @@
 Include %pkg.isc.rest.general
 
-Class UnitTest.isc.rest.openAPI Extends UnitTest.isc.rest.openAPI.testCase
+Class UnitTest.isc.rest.openAPI Extends UnitTest.isc.rest.testCase
 {
 
 Property UserContext;
 
 Property UserContextClass As %String;
-
-Method OnBeforeAllTests() As %Status
-{
-	Return ##super()
-}
-
-Method OnAfterAllTests() As %Status
-{
-	Set classname = ""
-	Do ..ClassTracker.GetNext(.classname)
-	While classname '= "" {
-		Do ..TeardownClass(classname)
-		Do ..ClassTracker.GetNext(.classname)
-	}
-	Return ##super()
-}
 
 Method TestSpecValidationWithPetStoreExample()
 {
@@ -920,8 +904,6 @@ Method TestIncludeForbiddenEndpointsFlag()
 	// Resource class setup
 	// Behavior should differ when an invalid MEDIATYPE is defined on a resource, leading success responses to not be generated
 	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-1","SOURCECLASS":"zUnitTest.isc.rest.class1","MEDIATYPE":"image/png"}, ,,, ,,, , ["CheckPermissionAllowAll:CheckPermission"]))
-	// Behavior should differ when invalid methods are referenced, leading to success response removal
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class2", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-2","SOURCECLASS":"zUnitTest.isc.rest.class2"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
 	// Behavior should differ when endpoints have no reachable success response due to the CheckPermission() method
 	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class3", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource-3","SOURCECLASS":"zUnitTest.isc.rest.class3"}, ,,, ,,, , ["CheckPermissionDenyAll:CheckPermission"]))
 	// Behavior should differ when endpoints have no reachable success response due to the ModifyOpenAPIInfo() method (ONLY when the endpoint has not been completely removed)
@@ -929,7 +911,6 @@ Method TestIncludeForbiddenEndpointsFlag()
 	
 	// Class compilation
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
-	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class2"))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class3"))
 	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class4"))
 	
@@ -939,7 +920,6 @@ Method TestIncludeForbiddenEndpointsFlag()
 	Do openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/")
 	Set spec = openapi.Specification
 	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource-1/get", spec)), "Endpoint with no success responses due to an invalid MEDIATYPE is NOT present")
-	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource-2/{id}/$nonexistent-method/get", spec)), "Endpoint with no success responses due to referencing a nonexistent method is NOT present")
 	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource-3/get", spec)), "Endpoint with no success responses due to the CheckPermission() method is NOT present")
 	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource/get", spec)), "Endpoint with no success responses due to the ModifyOpenAPIInfo() method is NOT present")
 	
@@ -953,7 +933,6 @@ Method TestIncludeForbiddenEndpointsFlag()
 	Do openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/")
 	Set spec = openapi.Specification
 	Do $$$AssertTrue($IsObject(spec.ResolveReference("#/paths//unittest-resource-1/get", spec)), "Endpoint with no success responses due to an invalid MEDIATYPE IS present")
-	Do $$$AssertTrue($IsObject(spec.ResolveReference("#/paths//unittest-resource-2/{id}/$nonexistent-method/get", spec)), "Endpoint with no success responses due to referencing a nonexistent method IS present")
 	Do $$$AssertTrue($IsObject(spec.ResolveReference("#/paths//unittest-resource-3/get", spec)), "Endpoint with no success responses due to the CheckPermission() method IS present")
 	Do $$$AssertTrue($IsObject(spec.ResolveReference("#/paths//unittest-resource/get", spec)), "Endpoint with no success responses due to the ModifyOpenAPIInfo() method IS present")
 	
@@ -962,43 +941,9 @@ Method TestIncludeForbiddenEndpointsFlag()
 	
 	// Class teardown
 	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.class1"))
-	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.class2"))
 	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.class3"))
 	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.class4"))
 	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.handler"))
-}
-
-Method TestNonexistantMethod()
-{
-	Set openapi = ..SetupTestingEnvironment()
-	#Dim openapi As %pkg.isc.rest.openAPI
-	Set openapi.DEBUG = 0
-	Set openapi.ForceAuthorizeAllEndpoints = 1
-	Set openapi.IncludeForbiddenEndpoints = 1
-	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.dbMappedResource"], {"RESOURCENAME":"unittest-resource","SOURCECLASS":"zUnitTest.isc.rest.class1"}, ,,, ,,, ["NonexistentMethodActionMap:ActionMap"], ["CheckPermissionAllowAll:CheckPermission"]))
-	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
-	Do $$$AssertTrue('openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation did NOT complete without errors")
-	Set spec = openapi.Specification
-	Do $$$AssertTrue(spec.Errors.Count() >= 1, "At least one error was logged")
-	
-	Do spec.%JSONExportToString(.str)
-	Do $$$LogMessage(str)
-	
-	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource/{id}/$nonexistent-method/get/responses/200",spec)), "HTTP 200 response was removed from endpoint referencing a non-existent method")
-	Do $$$AssertTrue($IsObject(spec.ResolveReference("#/paths//unittest-resource/{id}/$nonexistent-method/get/responses/500",spec)), "HTTP 500 response was added to endpoint referencing a non-existent method")
-	Set errorFound = 0
-	For i=1:1:spec.Errors.Count() {
-		Set error = $ZConvert(spec.Errors.GetAt(i), "U")
-		If error [ "EXIST" && (error [ "NO") && (error [ "NONEXISTENTMETHOD" || (error [ "NONEXISTENT-METHOD")) {
-			Set errorFound = 1
-		} Else {
-			Do $$$LogMessage("Found an error unrelated to this test: " _ spec.Errors.GetAt(i))
-		}
-	}
-	Do $$$AssertTrue(errorFound, "Action referencing a non-existent method fired an error")
-	
-	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.class1"), "")
-	Do $$$AssertStatusOK(..TeardownClass("zUnitTest.isc.rest.handler"), "")
 }
 
 Method TestUndesiredArgumentAndReturnTypesHandling()
@@ -1540,13 +1485,6 @@ XData PoorlyTypedMethodsActionMap [ XMLNamespace = "http://www.intersystems.com/
 </action>
 <action name="poorly-typed-method-3" target="class" method="GET" call="PoorlyTypedMethod3">
 </action>
-</actions>
-}
-
-XData NonexistentMethodActionMap [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/action" ]
-{
-<actions xmlns="http://www.intersystems.com/_pkg/isc/rest/action">
-<action name="nonexistent-method" target="instance" method="GET" call="NonExistentMethod" />
 </actions>
 }
 

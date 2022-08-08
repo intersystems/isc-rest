@@ -211,7 +211,7 @@ ClassMethod GetDocumentationBuildStatus() As %Status [ Final ]
 	} Catch {
 		Set buildParameters.userContext = $Get($$$DocParameterBuildUserGbl,"")
 	}
-	Write status.%ToJSON()
+	Do status.%ToJSON()
 	Return $$$OK
 }
 
@@ -245,7 +245,7 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 		Do ..ReportHttpStatusCode(..#HTTP423LOCKED)
 		Set %response.ContentType = "application/json"
 		Set status = {"statusUrl":"/build-documentation","statusMethod":"GET","buildStarted":false}
-		Write status.%ToJSON()
+		Do status.%ToJSON()
 		Return $$$OK
 	}
 	Set $$$DocLocksBuildGbl = 1
@@ -257,7 +257,7 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 	Set %response.ContentType = "application/json"
 	Set status = {"statusUrl":"/build-documentation","statusMethod":"GET"} 
 	Do status.%Set("buildStarted", $Test, "boolean")
-	Write status.%ToJSON()
+	Do status.%ToJSON()
 	Return $$$OK
 }
 
@@ -377,7 +377,7 @@ ClassMethod Supports(pEndpoint As %String, pHTTPVerb As %String, pRequest As %CS
 /// Check whether a given operation is supported for the resource.
 /// Returns 0 if the operation is not supported and sets the response status
 /// to 404 Not Found. <br />
-ClassMethod CheckSupports(pResourceClass As %Dictionary.CacheClassname, pOperation As %String, pType As %String) As %Boolean [ Final, Internal, Private ]
+ClassMethod CheckSupports(pResourceClass As %Dictionary.Classname, pOperation As %String, pType As %String) As %Boolean [ Final, Internal, Private ]
 {
 	// Wrap with $Get() on %request in case this is called during Open API generation
 	// and %request is not available.
@@ -385,7 +385,7 @@ ClassMethod CheckSupports(pResourceClass As %Dictionary.CacheClassname, pOperati
 }
 
 /// Checks both strategy- and resource-level permissions
-ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.CacheClassname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean [ Final ]
+ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.Classname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean [ Final ]
 {
 	Set strategy = ..AuthenticationStrategy()
 	Set authorized = 1
@@ -504,7 +504,7 @@ ClassMethod Create(resourceName As %String) As %Status [ Final ]
 
 /// Wrapper around <method>Supports</method> for the <method>Create</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsCreate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsCreate(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationCreate, $$$TypeOperationClass)
 }
@@ -557,7 +557,7 @@ ClassMethod CollectionQuery(resourceName As %String) As %Status [ Final ]
 
 /// Wrapper around <method>Supports</method> for the <method>CollectionQuery</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsCollectionQuery(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsCollectionQuery(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationQuery, $$$TypeOperationClass)
 }
@@ -593,7 +593,7 @@ ClassMethod Retrieve(resourceName As %String, id As %String) As %Status [ Final 
 
 /// Wrapper around <method>Supports</method> for the <method>Retrieve</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsRetrieve(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsRetrieve(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationInstance)
 }
@@ -634,7 +634,7 @@ ClassMethod Construct(resourceName As %String) As %Status [ Final ]
 /// Wrapper around <method>Supports</method> for the <method>Construct</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
 /// $$$OperationRead with no ID, or $$$OperationActionNew, is usable as validation for this special case.
-ClassMethod CheckSupportsConstruct(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsConstruct(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationRead, $$$TypeOperationClass) ||
 ..CheckSupports(pResourceClass, $$$OperationActionNew, $$$TypeOperationClass)
@@ -678,7 +678,7 @@ ClassMethod Update(resourceName As %String, id As %String) As %Status [ Final ]
 
 /// Wrapper around <method>Supports</method> for the <method>Update</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsUpdate(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsUpdate(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationUpdate, $$$TypeOperationInstance)
 }
@@ -718,7 +718,7 @@ ClassMethod Delete(resourceName As %String, id As %String) As %Status [ Final ]
 
 /// Wrapper around <method>Supports</method> for the <method>Delete</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDelete(pResourceClass As %Dictionary.CacheClassname) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsDelete(pResourceClass As %Dictionary.Classname) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationDelete, $$$TypeOperationInstance)
 }
@@ -765,7 +765,7 @@ ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %
 
 /// Wrapper around <method>Supports</method> for the <method>DispatchClassAction</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDispatchClassAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsDispatchClassAction(pResourceClass As %Dictionary.Classname, pAction As %String) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationClass)
 }
@@ -813,12 +813,12 @@ ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, actio
 
 /// Wrapper around <method>Supports</method> for the <method>DispatchInstanceAction</method>
 /// operation. Use this wrapper so it can be invoked from Open API generation.
-ClassMethod CheckSupportsDispatchInstanceAction(pResourceClass As %Dictionary.CacheClassname, pAction As %String) [ CodeMode = expression, Final, Internal ]
+ClassMethod CheckSupportsDispatchInstanceAction(pResourceClass As %Dictionary.Classname, pAction As %String) [ CodeMode = expression, Final, Internal ]
 {
 ..CheckSupports(pResourceClass, $$$OperationAction(pAction), $$$TypeOperationInstance)
 }
 
-ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As %String, Output pResourceClass As %Dictionary.CacheClassname) As %Dictionary.CacheClassname [ Final, Private ]
+ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As %String, Output pResourceClass As %Dictionary.Classname) As %Dictionary.Classname [ Final, Private ]
 {
 	#dim %response As %CSP.Response
 	#dim %request As %CSP.Request
@@ -827,19 +827,6 @@ ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As
 	Set contentType = ..GetMediaTypeFromContentType()
 	If (acceptsList = "") {
 		Set acceptsList = $ListBuild($Char(0))
-	} Else {
-		// Validation
-		Set ptr = 0
-		While $ListNext(acceptsList,ptr,accepts) {
-			If (accepts = "*/*") || (accepts = "application/*") {
-				// TODO: Support this with fallback
-				Continue
-			}
-			If '$Match(accepts,..#AllowedMediaTypeRegex) {
-				Do ..ReportHttpStatusCode(..#HTTP406NOTACCEPTABLE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
-				Return ""
-			}
-		}
 	}
 	
 	Set contentTypeList = $ListBuild(contentType)
@@ -886,19 +873,19 @@ ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As
 	Return ""
 }
 
-ClassMethod FindAcceptedClass(pResource As %String) As %Dictionary.CacheClassname [ Final, Private ]
+ClassMethod FindAcceptedClass(pResource As %String) As %Dictionary.Classname [ Final, Private ]
 {
 	#dim %request As %CSP.Request
 	Quit ..FindClass(..GetMediaTypeListFromAcceptHeader(),pResource,..#HTTP406NOTACCEPTABLE,1)
 }
 
-ClassMethod FindContentClass(pResource As %String) As %Dictionary.CacheClassname [ Final, Private ]
+ClassMethod FindContentClass(pResource As %String) As %Dictionary.Classname [ Final, Private ]
 {
 	#dim %request As %CSP.Request
 	Quit ..FindClass($ListBuild(..GetMediaTypeFromContentType()),pResource,..#HTTP415UNSUPPORTEDMEDIATYPE)
 }
 
-ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pStatusWhenInvalid As %String, pLookForDefault As %Boolean = 0) As %Dictionary.CacheClassname [ Final, Private ]
+ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pStatusWhenInvalid As %String, pLookForDefault As %Boolean = 0) As %Dictionary.Classname [ Final, Private ]
 {
 	Set pointer = 0
 	Set resourceClass = ""
@@ -1088,7 +1075,7 @@ ClassMethod outputStatus(pSC As %Status) As %Status [ Internal ]
             Set tSC = ..StatusToJSON(pSC, .tJSON)
             If $$$ISERR(tSC) Quit
             // Write the JSON to the output device
-           	Write tJSON.%ToJSON()
+           	Do tJSON.%ToJSON()
         } Else {
             // Set plain text
             Set %response.ContentType = ..#CONTENTTYPETEXT
