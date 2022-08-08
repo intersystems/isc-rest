@@ -1,4 +1,4 @@
-Class UnitTest.isc.rest.openAPI.schema Extends (UnitTest.isc.rest.openAPI.testCase, %pkg.isc.rest.openAPI.schema)
+Class UnitTest.isc.rest.openAPI.schema Extends (UnitTest.isc.rest.testCase, %pkg.isc.rest.openAPI.schema)
 {
 
 Method OnAfterOneTest() As %Status

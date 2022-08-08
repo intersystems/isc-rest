@@ -1,4 +1,4 @@
-Class UnitTest.isc.rest.openAPI.resourceInfo Extends UnitTest.isc.rest.openAPI.testCase
+Class UnitTest.isc.rest.openAPI.resourceInfo Extends UnitTest.isc.rest.testCase
 {
 
 Parameter CLASS1 = "UnitTest.isc.rest.openAPI.transientClass1";

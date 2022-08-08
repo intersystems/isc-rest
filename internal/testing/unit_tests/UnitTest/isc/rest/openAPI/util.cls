@@ -1,4 +1,4 @@
-Class UnitTest.isc.rest.openAPI.util Extends UnitTest.isc.rest.openAPI.testCase
+Class UnitTest.isc.rest.openAPI.util Extends UnitTest.isc.rest.testCase
 {
 
 Method TestFormatString()

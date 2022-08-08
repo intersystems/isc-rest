@@ -1,4 +1,4 @@
-Class UnitTest.isc.rest.compileTimeValidation Extends UnitTest.isc.rest.openAPI.testCase
+Class UnitTest.isc.rest.compileTimeValidation Extends UnitTest.isc.rest.testCase
 {
 
 Method TestRequiredHandlerMethods()
