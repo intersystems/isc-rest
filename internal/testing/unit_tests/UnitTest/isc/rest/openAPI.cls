@@ -440,7 +440,7 @@ Method TestGenerationWithSharedResourceName()
 	// /unittest-resource/$test-action checks
 	#Dim actionPathItem As %pkg.isc.rest.openAPI.model.pathItem
 	Set actionPathItem = openapi.Specification.Paths.GetAt("/unittest-resource/$test-action")
-	Do $$$AssertEquals(actionPathItem.SourceClasses.Count(), 2, "Action path item has only one source class")
+	Do $$$AssertEquals(actionPathItem.SourceClasses.Count(), 1, "Action path item has only one source class")
 	Do $$$AssertEquals(actionPathItem.SourceClasses.GetAt(1), "zUnitTest.isc.rest.class3", "Action path item has the correct source class")
 	Do $$$AssertEquals(actionPathItem.Get, "", "Action GET operation is not set")
 	Do $$$AssertEquals(actionPathItem.Put, "", "Action PUT operation is not set")
@@ -449,6 +449,15 @@ Method TestGenerationWithSharedResourceName()
 	Do $$$AssertEquals(actionPathItem.Trace, "", "Action TRACE operation is not set")
 	Do $$$AssertEquals(actionPathItem.Head, "", "Action HEAD operation is not set")
 	Do $$$AssertEquals(actionPathItem.Options, "", "Action OPTIONS operation is not set")
+	Do $$$AssertEquals(actionPathItem.Post.Tags.GetAt(1),"unittest-resource")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.Count(),2)
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(1).In,"query")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(1).Name,"op")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(1).Schema.Ref,"#/components/schemas/string_input")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(2).In,"query")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(2).Name,"uc")
+	Do $$$AssertEquals(actionPathItem.Post.Parameters.GetAt(2).Schema.Ref,"#/components/schemas/registered-object_input")
+	Do $$$AssertTrue($IsObject(actionPathItem.Post.RequestBody.Content.GetAt("application/json")))
 	
 	// /unittest-resource/{id} checks
 	#Dim resourceInstancePathItem As %pkg.isc.rest.openAPI.model.pathItem
@@ -1223,6 +1232,26 @@ Method TestPathParameterActions()
 	}
 }
 
+Method TestQueryFilters()
+{
+	Set openapi = ..SetupTestingEnvironment()
+	#Dim openapi As %pkg.isc.rest.openAPI
+	Set openapi.DEBUG = 0
+	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.class1", ["%Persistent","%pkg.isc.rest.model.adaptor"], {"RESOURCENAME":"unittest-resource"}, "Demo",{"Type":"%String"},{"%JSONFIELDNAME":"demo"}, ,,, , ["CheckPermissionAllowAll:CheckPermission","GetCollectionCustom:GetCollection"]))
+	Do $$$AssertStatusOK(..CompileClass("zUnitTest.isc.rest.class1"))
+	Do $$$AssertTrue(openapi.GetSpecificationI($$$NULLOREF, "/UnitTest/isc/rest/openAPI/api/"), "Specification generation completed without errors")
+	
+	Do openapi.Specification.%JSONExportToString(.str)
+	Do $$$LogMessage(str)
+
+	Set onlySearchParam = openapi.Specification.Paths.GetAt("/unittest-resource").Get.Parameters.GetAt(1)
+	Do $$$AssertTrue($IsObject(onlySearchParam))
+	Do $$$AssertEquals(onlySearchParam.In,"query")
+	Do $$$AssertEquals(onlySearchParam.Name,"demo")
+	Do $$$AssertEquals(onlySearchParam.Style,"deepObject")
+	Do $$$AssertEquals(onlySearchParam.Schema.Ref,"#/components/schemas/QueryFilter")
+}
+
 Method TestMultiHandlers()
 {
 	Do $$$AssertStatusOK(..SetupClass("zUnitTest.isc.rest.handler1", ["%pkg.isc.rest.handler"],, ,,, ,,, , ["AuthenticationStrategy","CheckResourcePermitted"]))
@@ -1498,4 +1527,3 @@ XData IntegerIdentityActionMap [ XMLNamespace = "http://www.intersystems.com/_pk
 }
 
 }
-

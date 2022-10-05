@@ -260,8 +260,12 @@ ClassMethod GetJSONType(className As %String) As %String
 		} ElseIf $ClassMethod(className, "%Extends", "%Stream.Object") {
 			// TODO: Support binary streams as NOT strings...
 			Set jsonType = "string"
+		} ElseIf (xsdType '= "") {
+			Set jsonType = $Select(xsdType="long":"integer",xsdType="boolean":"boolean",$Match(xsdType,"decimal|double|short|byte"):"number",1:"string")
+		} ElseIf ($$$comClassKeyGet(className,$$$cCLASSclasstype) = $$$cCLASSCLASSTYPEDATATYPE) {
+			Set jsonType = "string"
 		} Else {
-			Set jsonType = $Select(xsdType="":"object",xsdType="long":"integer",xsdType="boolean":"boolean",$Match(xsdType,"decimal|double|short|byte"):"number",1:"string")
+			Set jsonType = "object"
 		}
 	}
 	Set:className="%Library.DynamicArray" jsonType = "array"
@@ -339,4 +343,3 @@ ClassMethod ReadClassMethodOutput(className, methodName) As %String [ Internal ]
 }
 
 }
-
