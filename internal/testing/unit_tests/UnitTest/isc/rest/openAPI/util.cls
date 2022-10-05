@@ -41,6 +41,34 @@ Method TestGetJSON()
 	Do ..TeardownClass("zUnitTest.isc.rest.class1")
 }
 
+Method TestGetJSONType()
+{
+	#Define GetJSONType ##class(%pkg.isc.rest.openAPI.util).GetJSONType
+
+	// Objects
+	Do $$$AssertEquals($$$GetJSONType("%RegisteredObject"),"object")
+	Do $$$AssertEquals($$$GetJSONType("%SystemBase"),"object")
+	Do $$$AssertEquals($$$GetJSONType($classname()),"object")
+
+	// Normal datatypes
+	Do $$$AssertEquals($$$GetJSONType("%String"),"string")
+	Do $$$AssertEquals($$$GetJSONType("%Binary"),"string")
+	Do $$$AssertEquals($$$GetJSONType("%Numeric"),"number")
+	Do $$$AssertEquals($$$GetJSONType("%Integer"),"number")
+	Do $$$AssertEquals($$$GetJSONType("%Float"),"number")
+	Do $$$AssertEquals($$$GetJSONType("%Double"),"double")
+	Do $$$AssertEquals($$$GetJSONType("%Date"),"string")
+	Do $$$AssertEquals($$$GetJSONType("%Boolean"),"boolean")
+
+	// %List is treated as a string; we have a special datatype to project as array
+	Do $$$AssertEquals($$$GetJSONType("%List"),"string")
+	Do $$$AssertEquals($$$GetJSONType("%pkg.isc.json.dataType.list"),"array")
+
+	// Special cases: datatype classes without %JSONTYPE are strings
+	Do $$$AssertEquals($$$GetJSONType("%Dictionary.Classname"),"string")
+	Do $$$AssertEquals($$$GetJSONType("%Dictionary.CacheClassname"),"string")
+}
+
 Method TestFromJSON()
 {
 	#define JSONAdaptor ##class(UnitTest.isc.rest.openAPI.compatibility).GetJSONAdaptorClass()
@@ -76,4 +104,3 @@ ClassMethod SampleMethod()
 }
 
 }
-
