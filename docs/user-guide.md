@@ -24,6 +24,10 @@
   - [Exposing REST Resource in a REST handler](#exposing-rest-resource-in-a-rest-handler)
 - [Controlling Endpoints Exposed](#controlling-endpoints-exposed)
 - [Public API Surface](#public-api-surface)
+- [Generated OpenAPI Documentation](#generated-openapi-documentation)
+  - [Retrieving OpenAPI Documentation via ObjectScript Code](#retrieving-openapi-documentation-via-objectscript-code)
+  - [Retrieving OpenAPI Documentation over HTTP](#retrieving-openapi-documentation-over-http)
+  - [Customizing OpenAPI Generation (Advanced)](#customizing-openapi-generation-advanced)
 - [Known Limitations](#known-limitations)
   - [Actions](#actions-1)
 - [Related Topics in InterSystems Documentation](#related-topics-in-intersystems-documentation)
@@ -414,6 +418,65 @@ on the classes:
 
 Only the following include files should be directly used by consuming applications:
 - `%pkg.isc.rest.general`
+
+## Generated OpenAPI Documentation
+isc.rest supports generating OpenAPI documentation via REST and code APIs. A separate IPM package, [isc.ipm.js](https://github.com/intersystems/isc-ipm-js/blob/main/docs/user-guide.md#openapi-based-client-code-generation), takes this a step further to enable generation of client code using additional third-party libraries. If the end goal is to generate client code, start with isc.ipm.js.
+
+### Retrieving OpenAPI Documentation via ObjectScript Code
+To build and output OpenAPI documentation for your isc.rest-based API from ObjectScript, call the `ConsoleBuildOpenAPIDocumentation` method in your REST dispatch class. For example, the following ObjectScript method could be called to output OpenAPI documentation for the "phonebook" sample application included in the isc.rest repo:
+
+```
+Class DC.Demo.OpenAPIGen
+{
+ 
+ClassMethod Run(toFile As %String = "openapi.json") As %Status
+{
+	Set sc = $$$OK
+	Try {
+		Set sc = ##class(isc.sample.rest.phonebook.rest.Handler).ConsoleBuildOpenAPIDocumentation(
+			"/csp/user/phonebook-sample/api/",,,.response,
+      "https://mycustomendpoint.com/csp/user/phonebook-sample/api/")
+		$$$ThrowOnError(sc)
+ 
+		Set targetFile = ##class(%Library.File).NormalizeFilename(toFile)
+		Do ##class(%Library.File).CreateDirectoryChain(##class(%Library.File).GetDirectory(targetFile))
+ 
+		Set stream = ##class(%Stream.FileCharacter).%OpenId(targetFile)
+		$$$ThrowOnError(response.%JSONExportToString(.jsonString))
+		$$$ThrowOnError(##class(%pkg.isc.json.formatter).%New().FormatToStream(jsonString,stream))
+		$$$ThrowOnError(stream.%Save())
+	} Catch e {
+		Set sc = e.AsStatus()
+	}
+	If $$$ISERR(sc) && '$Quit {
+		Write !,$System.Status.GetErrorText(sc)
+	}
+	Quit sc
+}
+ 
+}
+```
+
+In this example:
+* "/csp/user/phonebook-sample/api/" is the IRIS web application for which an OpenAPI spec will be generated. (The same REST dispatch class could be enabled for multiple web applications, so the web application must be specified.)
+* `response` (output argument) contains a JSON-enabled object with the OpenAPI specification
+* "https://mycustomendpoint.com/csp/user/phonebook-sample/api/" is listed in the `servers` section of the OpenAPI spec.
+
+### Retrieving OpenAPI Documentation over HTTP
+Subclasses of `%pkg.isc.rest.handler` also support generation and retrieval of OpenAPI specifications over HTTP. For security purposes, this is disabled by default. To enable it, override `CheckPermission` in a `%pkg.isc.rest.handler` subclass and handle the endpoint / user context the same way as in a REST resource class.
+
+Endpoints for OpenAPI documentation generation/retrieval are:
+* `POST /build-documentation`: Starts OpenAPI generation (in a background process - it can take a while!)
+* `GET /build-documentation`: Returns current status of OpenAPI generation process
+* `GET /openapi.json`: Returns the latest version of the generated OpenAPI spec
+
+### Customizing OpenAPI Generation (Advanced)
+There are two ways to customize the OpenAPI documentation generated for an isc.rest API:
+
+* Overriding the method `ModifyOpenAPIInfo` in a REST resource class (to modify schemas and endpoints specific to that resource)
+* Overriding the method `ModifyOpenAPISpecification` in a subclass of `%pkg.isc.rest.handler` (with access to the entire spec)
+
+For more details, consult the class reference in your IRIS instance for the methods and classes in question.
 
 ## Known Limitations
 
