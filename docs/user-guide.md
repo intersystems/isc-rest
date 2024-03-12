@@ -435,7 +435,7 @@ ClassMethod Run(toFile As %String = "openapi.json") As %Status
 	Try {
 		Set sc = ##class(isc.sample.rest.phonebook.rest.Handler).ConsoleBuildOpenAPIDocumentation(
 			"/csp/user/phonebook-sample/api/",,,.response,
-      "https://mycustomendpoint.com/csp/user/phonebook-sample/api/")
+			"https://mycustomendpoint.com/csp/user/phonebook-sample/api/")
 		$$$ThrowOnError(sc)
  
 		Set targetFile = ##class(%Library.File).NormalizeFilename(toFile)
