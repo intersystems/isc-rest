@@ -734,6 +734,9 @@ ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %
 		Kill params
 		Merge params = %request.Data
 		
+		// Discard debug trigger
+		Kill params("CSPDEBUG")
+		
 		Set actionClass = ..FindActionClass(resourceName, action, "class", .resourceClass)
 		If (actionClass = "") {
 			Quit
@@ -779,6 +782,9 @@ ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, actio
 	Try {	
 		Kill params
 		Merge params = %request.Data
+		
+		// Discard debug trigger
+		Kill params("CSPDEBUG")
 		
 		Set actionClass = ..FindActionClass(resourceName, action, "instance", .resourceClass)
 		If (actionClass = "") {
