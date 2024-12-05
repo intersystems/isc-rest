@@ -5,10 +5,15 @@ ClassMethod RunOnLoad() [ CodeMode = objectgenerator ]
 	Quit:$Extract($Namespace)="^" $$$OK
 	Set sc = $$$OK
 	Try {
-		Set sourceDB = ##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabase($Namespace)
-		Set sc = ##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping($Namespace,"oddPKG(""%pkg.isc.rest"")",sourceDB)
+		If ##class(%Dictionary.ClassDefinition).%ExistsId("%IPM.Utils.Module") {
+			Set utilClass = "%IPM.Utils.Module"
+		} Else {
+			Set utilClass = "%ZPM.PackageManager.Developer.Utils"
+		}
+		Set sourceDB = $ClassMethod(utilClass, "GetRoutineDatabase", $Namespace)
+		Set sc = $ClassMethod(utilClass, "AddGlobalMapping", $Namespace, "oddPKG(""%pkg.isc.rest"")", sourceDB)
 		$$$ThrowOnError(sc)
-		Set sc = ##class(%ZPM.PackageManager.Developer.Utils).AddPackageMapping($Namespace,"%pkg.isc.rest",sourceDB)
+		Set sc = $ClassMethod(utilClass, "AddPackageMapping", $Namespace, "%pkg.isc.rest", sourceDB)
 		$$$ThrowOnError(sc)
 	} Catch e {
 		Set sc = e.AsStatus()
@@ -16,14 +21,24 @@ ClassMethod RunOnLoad() [ CodeMode = objectgenerator ]
 	Return sc
 }
 
+ClassMethod GetUtilClass() As %String
+{
+	If ##class(%Dictionary.ClassDefinition).%ExistsId("%IPM.Utils.Module") {
+		Return "%IPM.Utils.Module"
+	} Else {
+		Return "%ZPM.PackageManager.Developer.Utils"
+	}
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
 	Set sc = $$$OK
 	Try {
-		Set sourceDB = ##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabase($Namespace)
-		Set sc = ##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping($Namespace,"oddPKG(""%pkg.isc.rest"")",sourceDB)
+		Set utilClass = ..GetUtilClass()
+		Set sourceDB = $ClassMethod(utilClass, "GetRoutineDatabase", $Namespace)
+		Set sc = $ClassMethod(utilClass, "AddGlobalMapping", $Namespace, "oddPKG(""%pkg.isc.rest"")", sourceDB)
 		$$$ThrowOnError(sc)
-		Set sc = ##class(%ZPM.PackageManager.Developer.Utils).AddPackageMapping($Namespace,"%pkg.isc.rest",sourceDB)
+		Set sc = $ClassMethod(utilClass, "AddPackageMapping", $Namespace, "%pkg.isc.rest", sourceDB)
 		$$$ThrowOnError(sc)
 		// Ensure super is called AFTER mappings are set up
 		Set sc = ##super(.pParams)
@@ -40,8 +55,9 @@ Method %Clean(ByRef pParams) As %Status
 	Try {
 		Set sc = ##super(.pParams)
 		$$$ThrowOnError(sc)
-		Do ##class(%ZPM.PackageManager.Developer.Utils).RemoveGlobalMapping($Namespace,"oddPKG(""%pkg.isc.rest"")")
-		Do ##class(%ZPM.PackageManager.Developer.Utils).RemovePackageMapping($Namespace,"%pkg.isc.rest")
+		Set utilClass = ..GetUtilClass()
+		Do $ClassMethod(utilClass, "RemoveGlobalMapping", $Namespace, "oddPKG(""%pkg.isc.rest"")")
+		Do $ClassMethod(utilClass, "RemovePackageMapping", $Namespace,"%pkg.isc.rest")
 	} Catch e {
 		Set sc = e.AsStatus()
 	}
