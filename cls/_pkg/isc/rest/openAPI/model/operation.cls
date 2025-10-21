@@ -41,8 +41,10 @@ Property Servers As list Of %pkg.isc.rest.openAPI.model.server(%JSONFIELDNAME = 
 /// The action name for this endpoint (if any)
 Property ActionName As %String(%JSONINCLUDE = "none");
 
-/// Used to track the class(es) that caused this object to be generated
-Property SourceClasses As list Of %String(%JSONINCLUDE = "none");
+/// Used to track the class(es) that caused this object to be generated.
+/// MAXLEN to match <class>%Dictionary.Classname</class>. MUST use %String or else
+/// cannot save due to lack of Normalize() method in %Dictionary.Classname.
+Property SourceClasses As list Of %String(%JSONINCLUDE = "none", MAXLEN = 200);
 
 /// Used to track the ActionInfo used in this operation's creation
 Property SourceActionInfo As %pkg.isc.rest.openAPI.actionInfo(%JSONINCLUDE = "none");

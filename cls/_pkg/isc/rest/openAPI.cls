@@ -1596,16 +1596,28 @@ Method WriteActionEndpoints() [ Internal, Private ]
 					// don't add duplicate "OneOf" entries with the same reference.
 					// (Could do deduplication downstream too.)
 					Set foundRef = 0
-					If (schema.Ref '= "") {
-						For j=1:1:baseSchema.OneOf.Count() {
-							If baseSchema.OneOf.GetAt(j).Ref = schema.Ref {
-								Set foundRef = 1
-							}
+					If ($ClassName(baseSchema) '= "%pkg.isc.rest.openAPI.model.schema") {
+						// Not a schema class, then it's a reference
+						If (schema.Ref '= "") && (baseSchema.Ref = schema.Ref) {
+							Set foundRef = 1
+						}
+						If 'foundRef {
+							Set baseSchema = schema
 						}
 					}
-					If 'foundRef {
-						Do baseSchema.OneOf.Insert(schema)
+					Else {						
+						If (schema.Ref '= "") {
+							For j=1:1:baseSchema.OneOf.Count() {
+								If baseSchema.OneOf.GetAt(j).Ref = schema.Ref {
+									Set foundRef = 1
+								}
+							}
+						}
+						If 'foundRef {
+							Do baseSchema.OneOf.Insert(schema)
+						}
 					}
+
 					For j=1:1:schema.SourceClasses.Count() {
 						Do baseSchema.SourceClasses.Insert(schema.SourceClasses.GetAt(j))
 					}
@@ -1941,6 +1953,9 @@ Method GetNiceName(stub As %pkg.isc.rest.openAPI.resourceInfoStub) [ Internal ]
 		If $ClassMethod(className, "%Extends", "%pkg.isc.rest.model.proxy") {
 			Set className = $Parameter(className, "SOURCECLASS")
 		}
+		If $ClassMethod(className, "%Extends", "%pkg.isc.rest.model.singleton") {
+			Set className = $Parameter(className, "SingletonClass")
+		}
 		
 		// Get either the resource name (if it exists), or create a "nice" looking name from the class name
 		Set val = $Parameter(initialClassName,"RESOURCENAME")
@@ -1986,3 +2001,4 @@ Method WriteSection(text, ByRef ws, ByRef timer) [ Internal, Private ]
 }
 
 }
+

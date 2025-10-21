@@ -9,8 +9,10 @@ Property RequestBody As %pkg.isc.rest.openAPI.model.requestBody(%JSONINCLUDE = "
 
 Property Reference As %pkg.isc.rest.openAPI.model.reference(%JSONINCLUDE = "none") [ Internal ];
 
-/// Used to track the class(es) that caused this object to be generated
-Property SourceClasses As list Of %String(%JSONINCLUDE = "none");
+/// Used to track the class(es) that caused this object to be generated.
+/// MAXLEN to match <class>%Dictionary.Classname</class>. MUST use %String or else
+/// cannot save due to lack of Normalize() method in %Dictionary.Classname.
+Property SourceClasses As list Of %String(%JSONINCLUDE = "none", MAXLEN = 220);
 
 Method RemoveAllFromSource(className As %String, Output keepSelf As %Boolean)
 {

@@ -6,6 +6,8 @@ Index UniqueByContext On (DispatchOrResourceClass, ResourceName, MediaType) [ Un
 
 Index ResourceClass On ResourceClass;
 
+Index ResourceName On ResourceName;
+
 Index UniqueByClassnames On (DispatchOrResourceClass, ResourceClass) [ Unique ];
 
 Index UniqueDefaultResource On (DispatchOrResourceClass, ResourceName, IsDefault) [ Data = MediaType, Unique ];
@@ -48,6 +50,27 @@ Trigger UpdatePermittedHandlers [ Event = INSERT, Foreach = row/object, Time = A
 	}
 }
 
+/// Helper method, 
+ClassMethod FindDefaultResourceForRequest(pClassName As %String, pResource As %String, pMediaTypeList As %Library.List) As %String
+{
+	Set resourceClass = ""
+	If ##class(%pkg.isc.rest.resourceMap).UniqueDefaultResourceExists(pClassName,pResource,1,.id) {
+		Set pointer = 0
+		Set defaultResourceClass = ##class(%pkg.isc.rest.resourceMap).ResourceClassGetStored(id)
+		Set mediaType = ##class(%pkg.isc.rest.resourceMap).MediaTypeGetStored(id)
+		Set orderedTypeList = ##class(%pkg.isc.rest.handler).OrderMediaTypeList(pMediaTypeList)
+		While $ListNext(orderedTypeList,pointer,type) {
+			// Convert accepted media type to RegEx
+			Set regEx = $Replace(type,"*",".*")
+			Set regEx = $Replace(regEx,"+","\+")
+			If $Match(mediaType,regEx) {
+				Set resourceClass = defaultResourceClass
+			}
+		}
+	}
+	Return resourceClass
+}
+
 Storage Default
 {
 <Data name="resourceMapDefaultData">
@@ -79,3 +102,4 @@ Storage Default
 }
 
 }
+

@@ -92,7 +92,7 @@ Method %OnNew(className, jsonMapping, resourceName, mediaType, includeID, idFiel
 	Return $$$OK
 }
 
-Method PopulateNonOverwrittenValues(fallbackReference = "OBJECT", fallbackIncludeID = 1, fallbackIDField = "_id")
+Method PopulateNonOverwrittenValues(fallbackReference = "OBJECT", fallbackIncludeID = 0, fallbackIDField = "_id")
 {
 	
 	// JSON Type

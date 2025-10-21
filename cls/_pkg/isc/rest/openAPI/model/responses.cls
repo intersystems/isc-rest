@@ -14,8 +14,10 @@ Parameter KEYREGEX = "default|[1-5](XX|[0-9]{2})";
 /// @OpenAPI: The default [array key] MAY be used as a default response object for all HTTP codes that are not covered individually by the specification.
 Property Data As array Of %pkg.isc.rest.openAPI.model.responseOrReference;
 
-/// Used to track the class(es) that caused this object to be generated
-Property SourceClasses As list Of %String(%JSONINCLUDE = "none");
+/// Used to track the class(es) that caused this object to be generated.
+/// MAXLEN to match <class>%Dictionary.Classname</class>. MUST use %String or else
+/// cannot save due to lack of Normalize() method in %Dictionary.Classname.
+Property SourceClasses As list Of %String(%JSONINCLUDE = "none", MAXLEN = 220);
 
 /// @Override: Object-specific validation logic within a given OpenAPI Specification (use ..ValidateComponent() for full validation)
 Method Validate(fullSpecification As %pkg.isc.rest.openAPI.model.openAPI = "", debug = 0) As %Boolean

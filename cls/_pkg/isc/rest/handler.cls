@@ -3,7 +3,7 @@ Include (%occErrors, %pkg.isc.rest.openAPI, %pkg.isc.rest.general)
 /// Base REST handler for APIs built on %pkg.isc.rest.
 /// Consumers should extend this, override <method>GetUserResource</method> and <method>AuthenticationStrategy</method> appropriately, and
 /// should *NOT* override the UrlMap XData block.
-Class %pkg.isc.rest.handler Extends %CSP.REST [ System = 4 ]
+Class %pkg.isc.rest.handler Extends %CSP.REST [ Abstract, System = 4 ]
 {
 
 /// Determines what mode queries using this REST handler will be run in.  Defaults to 0 (Logical Mode).
@@ -15,6 +15,11 @@ Parameter QuerySelectMode As INTEGER = 0;
 /// <li> pFullUserInfo: dynamic object with full user info provided by the authentication strategy
 /// <ul>
 ClassMethod GetUserResource(pFullUserInfo As %DynamicObject) As %pkg.isc.rest.model.iSerializable
+{
+	Quit $$$NULLOREF
+}
+
+ClassMethod GetLoginResource(pLoginInfo As %DynamicObject) As %pkg.isc.rest.model.iSerializable
 {
 	Quit $$$NULLOREF
 }
@@ -46,7 +51,7 @@ Parameter APIVersion = "0.1.0";
 
 /// Endpoints for which <method>Supports</method> is called. Take a look at
 /// the method documentation to see how this parameter is used.
-Parameter SupportsCheckEndpoints [ Final ] = {$ListBuild("/auth/status:GET","/auth/logout:POST","/build-documentation:POST","/build-documentation:GET","/openapi.json:GET")};
+Parameter SupportsCheckEndpoints [ Final ] = {$LISTBUILD("/auth/status:GET","/auth/logout:POST","/build-documentation:POST","/build-documentation:GET","/openapi.json:GET")};
 
 /// Regex for the isc.rest supported media types.
 Parameter AllowedMediaTypeRegex As STRING [ Final, Internal ] = "application/(.*\+)?json";
@@ -58,6 +63,7 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Routes>
 <!-- Authentication routes -->
 <Route Url="/auth/status" Method="GET" Call="GetUserInfo" />
+<Route Url="/auth/login" Method="POST" Call="AuthLogin" />
 <Route Url="/auth/logout" Method="POST" Call="LogOut" />
 
 <!-- Documentation methods -->
@@ -70,34 +76,32 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Route Url="/:resource" Method="POST" Call="Create" />
 <Route Url="/:resource/\$new" Method="GET" Call="Construct" />
 
-<!-- "class actions" (GET/PUT/POST/DELETE) -->
+<!-- "class actions" (GET/PUT/POST/DELETE/PATCH) -->
 <Route Url="/:resource/\$(.+)" Method="GET" Call="DispatchClassAction" />
 <Route Url="/:resource/\$(.+)" Method="PUT" Call="DispatchClassAction" />
 <Route Url="/:resource/\$(.+)" Method="POST" Call="DispatchClassAction" />
 <Route Url="/:resource/\$(.+)" Method="DELETE" Call="DispatchClassAction" />
+<Route Url="/:resource/\$(.+)" Method="PATCH" Call="DispatchClassAction" />
 
 <!-- Resource "instance methods" -->
 <Route Url="/:resource/:id" Method="GET" Call="Retrieve" />
 <Route Url="/:resource/:id" Method="PUT" Call="Update" />
 <Route Url="/:resource/:id" Method="DELETE" Call="Delete" />
 
-<!-- "instance actions" (GET/PUT/POST/DELETE) -->
+<!-- "instance actions" (GET/PUT/POST/DELETE/PATCH) -->
 <Route Url="/:resource/:id/\$(.+)" Method="GET" Call="DispatchInstanceAction" />
 <Route Url="/:resource/:id/\$(.+)" Method="PUT" Call="DispatchInstanceAction" />
 <Route Url="/:resource/:id/\$(.+)" Method="POST" Call="DispatchInstanceAction" />
 <Route Url="/:resource/:id/\$(.+)" Method="DELETE" Call="DispatchInstanceAction" />
+<Route Url="/:resource/:id/\$(.+)" Method="PATCH" Call="DispatchInstanceAction" />
 </Routes>
 }
 
 /// Ensures all required parameters are overridden in non-abstract subclasses.
 ClassMethod "%%CheckClassValidity"() [ CodeMode = objectgenerator, GenerateAfter = SupportedVerbs, Internal, Private ]
 {
-	If (%class.Name = "%pkg.isc.rest.handler") {
-		Quit $$$OK
-	}
-	
 	// Require non-abstract CheckResourcePermitted and AuthenticationStrategy methods
-	Set overrides = $ListBuild("m:AuthenticationStrategy","m:CheckResourcePermitted")
+	Set overrides = $LISTBUILD("m:AuthenticationStrategy","m:CheckResourcePermitted")
 	Return ##class(%pkg.isc.rest.compileTimeCheck).RequireOverrides(overrides,"%pkg.isc.rest.handler")
 }
 
@@ -113,7 +117,7 @@ ClassMethod GetOpenAPISpecification() As %Status [ Final ]
 	}
 	Set result = ##class(%SQL.Statement).%ExecDirect(,
 		"select top 1 ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",
-		$ClassName())
+		$CLASSNAME())
 	#Dim result As %SQL.StatementResult
 	If result.%SQLCODE = 0 {
 		Set %response.ContentType = "application/json"
@@ -136,19 +140,19 @@ ClassMethod GetOpenAPISpecification() As %Status [ Final ]
 ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, Output response As %pkg.isc.rest.openAPI.model.openAPI, endpointOverride As %String = "") As %Status [ Final ]
 {
 	Try {
-		Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
-		If '$IsObject(buildLock) {
+		Set buildLock = $SYSTEM.AutoLock.Lock($NAME($$$DocLocksBuildGbl),"E",1)
+		If '$ISOBJECT(buildLock) {
 			Return $$$ERROR(8222, "Failed to acquire BuildDocumentation lock (another build is already in progress)")
 		}
 		Set $$$DocLocksBuildGbl = 2
-		Set $$$DocTimingBuildStartGbl = $ZDatetime($Horolog, -2)
+		Set $$$DocTimingBuildStartGbl = $ZDATETIME($HOROLOG, -2)
 		Kill $$$DocTimingBuildFinishGbl
 		Set $$$DocParameterBuildDebugGbl = debug
 		Set $$$DocParameterBuildInternalGbl = internal
 		Set status = ##class(%pkg.isc.rest.openAPI).GetSpecification(.response,, apiPath, debug, internal, 1, endpointOverride)
 		Set $$$DocStageBuildOpenAPIGbl = "Save specification..."
 		Set result = ##class(%SQL.Statement).%ExecDirect(,
-			"select ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",$ClassName())
+			"select ID from %pkg_isc_rest_openAPI_model.openAPI where DispatchClass = ?",$CLASSNAME())
 		#Dim result As %SQL.StatementResult
 		If result.%SQLCODE = 0 {
 			While result.%Next() {
@@ -157,22 +161,22 @@ ClassMethod ConsoleBuildOpenAPIDocumentation(apiPath, debug = 0, internal = 0, O
 		}
 		Set saveableResponse = response.GetSaveableInstance()
 		Set status2 = saveableResponse.%Save()
-		Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
+		Set $$$DocTimingBuildFinishGbl = $ZDATETIME($HOROLOG, -2)
 		Set $$$DocLocksBuildGbl = 0
 		If 'status {
 			Set $$$DocStageBuildOpenAPIGbl = "Build failed: GetSpecification() returned false; saved anyway (console builds always save)"
 			Return $$$ERROR($$$GeneralError, "OpenAPI Specification Generation Error")
 		}
-		If $System.Status.IsError(status2) {
-			Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $System.Status.GetErrorText(status2) _ "; saved anyway (console builds always save)"
+		If $SYSTEM.Status.IsError(status2) {
+			Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $SYSTEM.Status.GetErrorText(status2) _ "; saved anyway (console builds always save)"
 			Return status2
 		}
 		Set $$$DocStageBuildOpenAPIGbl = "Finished"
 		Return $$$OK
 	} Catch e {
-		Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
+		Set $$$DocTimingBuildFinishGbl = $ZDATETIME($HOROLOG, -2)
 		Set $$$DocLocksBuildGbl = 0
-		Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $System.Status.GetErrorText(e.AsStatus()) _ "; saved anyway (console builds always save)"
+		Set $$$DocStageBuildOpenAPIGbl = "Build failed: " _ $SYSTEM.Status.GetErrorText(e.AsStatus()) _ "; saved anyway (console builds always save)"
 		Return e.AsStatus()
 	}
 }
@@ -188,28 +192,28 @@ ClassMethod GetDocumentationBuildStatus() As %Status [ Final ]
 		Return $$$OK
 	}
 	Set %response.ContentType = "application/json"
-	Set buildStage = $Get($$$DocLocksBuildGbl, 0)
+	Set buildStage = $GET($$$DocLocksBuildGbl, 0)
 	Set status = {}
-	Do status.%Set("buildInProgress", $Case(buildStage,0:0,:1), "boolean")
-	Set status.buildStartedTime = $Get($$$DocTimingBuildStartGbl,0)
-	Set status.buildFinishedTime = $Get($$$DocTimingBuildFinishGbl,0)
+	Do status.%Set("buildInProgress", $CASE(buildStage,0:0,:1), "boolean")
+	Set status.buildStartedTime = $GET($$$DocTimingBuildStartGbl,0)
+	Set status.buildFinishedTime = $GET($$$DocTimingBuildFinishGbl,0)
 	Set buildProgress = {}
 	Set status.buildProgress = buildProgress
 	Set buildProgress.buildStage = buildStage
-	Set documentationType = $Order($$$DocStageBuildDocTypeGbl(""))
+	Set documentationType = $ORDER($$$DocStageBuildDocTypeGbl(""))
 	While documentationType '= "" {
 		Set documentationStatus = $$$DocStageBuildDocTypeGbl(documentationType)
 		Do buildProgress.%Set(documentationType, documentationStatus)
-		Set documentationType = $Order($$$DocStageBuildDocTypeGbl(documentationType))
+		Set documentationType = $ORDER($$$DocStageBuildDocTypeGbl(documentationType))
 	}
 	Set buildParameters = {}
 	Set status.buildParameters = buildParameters
-	Do buildParameters.%Set("debug", $Get($$$DocParameterBuildDebugGbl,0), "number")
-	Do buildParameters.%Set("internal", $Get($$$DocParameterBuildInternalGbl,0), "number")
+	Do buildParameters.%Set("debug", $GET($$$DocParameterBuildDebugGbl,0), "number")
+	Do buildParameters.%Set("internal", $GET($$$DocParameterBuildInternalGbl,0), "number")
 	Try {
-		Set buildParameters.userContext = {}.%FromJSON($Get($$$DocParameterBuildUserGbl,""))
+		Set buildParameters.userContext = {}.%FromJSON($GET($$$DocParameterBuildUserGbl,""))
 	} Catch {
-		Set buildParameters.userContext = $Get($$$DocParameterBuildUserGbl,"")
+		Set buildParameters.userContext = $GET($$$DocParameterBuildUserGbl,"")
 	}
 	Do status.%ToJSON()
 	Return $$$OK
@@ -225,7 +229,7 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 	Merge params = %request.Data
 	Set userContext = ..GetUserContext()
 	Set userContextString = "", userContextClassName = "", userContextID = ""
-	If $IsObject(userContext) {
+	If $ISOBJECT(userContext) {
 		Try {
 			Do userContext.JSONExportToString(.userContextString)
 		}
@@ -234,14 +238,14 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 			Set userContextID = userContext.%Id()
 		}
 		Catch {}
-		Set userContextClassName = $ClassName(userContext)
+		Set userContextClassName = $CLASSNAME(userContext)
 	}
 	If '..CheckPermission("/build-documentation", userContext, .params) {
 		Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: endpoint /build-documentation"))
 		Return $$$OK
 	}
-	Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
-	If '$IsObject(buildLock) || $Get($$$DocLocksBuildGbl) {
+	Set buildLock = $SYSTEM.AutoLock.Lock($NAME($$$DocLocksBuildGbl),"E",1)
+	If '$ISOBJECT(buildLock) || $GET($$$DocLocksBuildGbl) {
 		Do ..ReportHttpStatusCode(..#HTTP423LOCKED)
 		Set %response.ContentType = "application/json"
 		Set status = {"statusUrl":"/build-documentation","statusMethod":"GET","buildStarted":false}
@@ -249,14 +253,14 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 		Return $$$OK
 	}
 	Set $$$DocLocksBuildGbl = 1
-	Set debug = $Get(params("debug",1), 0)
-	Set internal = $Get(params("internal",1), 0)
+	Set debug = $GET(params("debug",1), 0)
+	Set internal = $GET(params("internal",1), 0)
 	Set $$$DocParameterBuildDebugGbl = debug
 	Set $$$DocParameterBuildInternalGbl = internal
-	Job ..BuildDocumentationInternal(debug, internal, %request.Application, userContextString, userContextID, userContextClassName):():2
+	Job ..BuildDocumentationInternal(debug, internal, %request.AppMatch, userContextString, userContextID, userContextClassName):():2
 	Set %response.ContentType = "application/json"
 	Set status = {"statusUrl":"/build-documentation","statusMethod":"GET"} 
-	Do status.%Set("buildStarted", $Test, "boolean")
+	Do status.%Set("buildStarted", $TEST, "boolean")
 	Do status.%ToJSON()
 	Return $$$OK
 }
@@ -269,16 +273,16 @@ ClassMethod BuildDocumentationEndpoint() As %Status [ Final ]
 ClassMethod BuildDocumentationInternal(debug, internal, application, userContextString, userContextID, userContextClass) [ Final, Internal ]
 {
 	// Init
-	Set buildLock = $System.AutoLock.Lock($Name($$$DocLocksBuildGbl),"E",1)
+	Set buildLock = $SYSTEM.AutoLock.Lock($NAME($$$DocLocksBuildGbl),"E",1)
 	// OpenAPI
 	Set $$$DocLocksBuildGbl = 2
-	Set $$$DocTimingBuildStartGbl = $ZDatetime($Horolog, -2)
+	Set $$$DocTimingBuildStartGbl = $ZDATETIME($HOROLOG, -2)
 	Kill $$$DocTimingBuildFinishGbl
 	Try
 	{
 		Set $$$DocStageBuildOpenAPIGbl = "Calling GetSpecification()"
 		Try {
-			Set userContext = $ClassMethod(userContextClass, "%OpenId", userContextID, , .sc)
+			Set userContext = $CLASSMETHOD(userContextClass, "%OpenId", userContextID, , .sc)
 			$$$ThrowOnError(sc)
 			Set sc = userContext.JSONImport(userContextString)
 			Set jsonID = {}
@@ -289,7 +293,7 @@ ClassMethod BuildDocumentationInternal(debug, internal, application, userContext
 		} Catch {
 			Set jsonID = {}
 			Try {
-				Set userContext = $ClassMethod(userContextClass, "%New")
+				Set userContext = $CLASSMETHOD(userContextClass, "%New")
 				Set sc = userContext.JSONImport(userContextString)
 				$$$ThrowOnError(sc)
 				Do jsonID.%Set("_id", "N/A")
@@ -328,16 +332,16 @@ ClassMethod BuildDocumentationInternal(debug, internal, application, userContext
 			}
 		}
 		If 'status && ('getSpecificationFailed || debug) {
-			Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $System.Status.GetErrorText(status)
+			Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $SYSTEM.Status.GetErrorText(status)
 		}
 	} Catch ex {
-		Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $System.Status.GetErrorText(ex.AsStatus())
+		Set $$$DocStageBuildOpenAPIGbl = "Failed: " _ $SYSTEM.Status.GetErrorText(ex.AsStatus())
 	}
 	
 	// Additional documentation types go here!
 	
 	// Finish
-	Set $$$DocTimingBuildFinishGbl = $ZDatetime($Horolog, -2)
+	Set $$$DocTimingBuildFinishGbl = $ZDATETIME($HOROLOG, -2)
 	Set $$$DocLocksBuildGbl = 0
 }
 
@@ -381,24 +385,34 @@ ClassMethod CheckSupports(pResourceClass As %Dictionary.Classname, pOperation As
 {
 	// Wrap with $Get() on %request in case this is called during Open API generation
 	// and %request is not available.
-	Return $ClassMethod(pResourceClass, "Supports", pOperation, pType, $Get(%request))
+	Return $CLASSMETHOD(pResourceClass, "Supports", pOperation, pType, $GET(%request))
 }
 
 /// Checks both strategy- and resource-level permissions
 ClassMethod CheckAllPermissions(pResourceClass As %Dictionary.Classname, pID As %String, pOperation As %String, pUserContext As %String, ByRef pURLParams) As %Boolean [ Final ]
 {
-	Set strategy = ..AuthenticationStrategy()
-	Set authorized = 1
-	If (strategy '= "") && $System.CLS.IsMthd(strategy,"CheckPermission") {
-		Set authorized = $ClassMethod(strategy,"CheckPermission", pResourceClass, pOperation, pUserContext)
-	}
-	Set authorized = authorized && $ClassMethod(pResourceClass, "CheckPermission", pID, pOperation, pUserContext, .pURLParams)
-	Quit authorized
+	Return +..ExecuteAuthenticationStrategyMethod("CheckPermission", pResourceClass, pOperation, pUserContext)
+		&& $CLASSMETHOD(pResourceClass, "CheckPermission", pID, pOperation, pUserContext, .pURLParams)
 }
 
 /// Subclasses must override this to define a custom authentication strategy class.
 ClassMethod AuthenticationStrategy() As %Dictionary.Classname [ Abstract ]
 {
+}
+
+ClassMethod ExecuteAuthenticationStrategyMethod(pMethodName As %String, pArgs...) As %Status [ Internal, Private ]
+{
+	Set strategyClass = ..AuthenticationStrategy()
+	// Check if WithDispatch equivalent exists first and execute if it does
+	If $SYSTEM.CLS.IsMthd(strategyClass, pMethodName_"WithDispatch") {
+		Return $CLASSMETHOD(strategyClass, pMethodName_"WithDispatch", ..%ClassName(1), pArgs...)
+	}
+	// WithDispatch did not exist so call without dispatch class
+	If $SYSTEM.CLS.IsMthd(strategyClass, pMethodName) {
+		Return $CLASSMETHOD(strategyClass, pMethodName, pArgs...)
+	}
+	// Just return ok as a no-op
+	Return $$$OK
 }
 
 /// This method Gets called prior to dispatch of the request. Put any common code here
@@ -412,9 +426,9 @@ ClassMethod OnPreDispatch(pUrl As %String, pMethod As %String, ByRef pContinue A
 	Set endpointList = ..#SupportsCheckEndpoints
 	Set ptr = 0
 	Set supports = 1
-	While $ListNext(endpointList,ptr,endpoint) {
-		Set url = $Piece(endpoint, ":", 1)
-		Set method = $Piece(endpoint, ":", 2)
+	While $LISTNEXT(endpointList,ptr,endpoint) {
+		Set url = $PIECE(endpoint, ":", 1)
+		Set method = $PIECE(endpoint, ":", 2)
 		If (pUrl = url) && (pMethod = method) {
 			Set supports = ..Supports(url, method, %request)
 			Quit
@@ -426,10 +440,11 @@ ClassMethod OnPreDispatch(pUrl As %String, pMethod As %String, ByRef pContinue A
 		Return $$$OK
 	}
 	If pMethod '= "OPTIONS" { // OPTIONS requests are never authenticated
-		Set sc = $ClassMethod(..AuthenticationStrategy(),"Authenticate",pUrl,.pContinue)
+		Set sc = ..ExecuteAuthenticationStrategyMethod("Authenticate",pUrl,.pContinue)
+		Set pContinue = 1
 	}
 	Do:'pContinue ..OnHandleCorsRequest(pUrl)
-	If (pMethod = "GET") && $IsObject($Get(%session)) {
+	If (pMethod = "GET") && $ISOBJECT($GET(%session)) {
 		// Permit concurrent GET requests
 		Do %session.Unlock()
 	}
@@ -440,7 +455,7 @@ ClassMethod GetUserInfo() As %Status [ Final ]
 {
 	#dim %response As %CSP.Response
 	Set userContext = ..GetUserContext()
-	If $IsObject(userContext) {
+	If $ISOBJECT(userContext) {
 		Set %response.ContentType = userContext.#MEDIATYPE
 		$$$ThrowOnError(userContext.JSONExport())
 	} Else {
@@ -451,13 +466,30 @@ ClassMethod GetUserInfo() As %Status [ Final ]
 
 ClassMethod GetUserContext() As %pkg.isc.rest.model.resource [ Final ]
 {
-	$$$ThrowOnError($ClassMethod(..AuthenticationStrategy(),"UserInfo",.userInfo))
+	$$$ThrowOnError(..ExecuteAuthenticationStrategyMethod("UserInfo",.userInfo))
 	Quit ..GetUserResource(.userInfo)
+}
+
+ClassMethod AuthLogin() As %Status [ Final ]
+{
+	#dim %response As %CSP.Response
+	$$$ThrowOnError(..ExecuteAuthenticationStrategyMethod("Login",.loginInfo))
+	If %response.Status '= ..#HTTP200OK {
+		Quit $$$OK
+	}
+	If loginInfo'="" {
+		Set loginResource = ..GetLoginResource(.loginInfo)
+		Set %response.ContentType = loginResource.#MEDIATYPE
+		$$$ThrowOnError(loginResource.JSONExport())
+	} Else {
+		Set %response.Status = ..#HTTP204NOCONTENT
+	}
+	Quit $$$OK
 }
 
 ClassMethod LogOut() As %Status [ Final ]
 {
-	Quit $ClassMethod(..AuthenticationStrategy(),"Logout")
+	Quit ..ExecuteAuthenticationStrategyMethod("Logout")
 }
 
 /// Creates a new instance of the resource (handling a POST request to the resource's endpoint)
@@ -490,14 +522,16 @@ ClassMethod Create(resourceName As %String) As %Status [ Final ]
 	// Grab the json body from the incoming reqeust
 	Set json = {}.%FromJSON(%request.Content)
 	// Instantiate a proxy without passing an id; this will give us an empty one
-	Set resourceToUse = $ClassMethod(resourceClass, "GetModelInstance")
+	#dim resourceToUse As %pkg.isc.rest.model.resource
+	Set resourceToUse = $CLASSMETHOD(resourceClass, "GetModelInstance")
 	$$$ThrowOnError(resourceToUse.JSONImport(json))
 	Do resourceToUse.SaveModelInstance(userContext)
 	
 	// Respond with a json block representing the newly posted resource
 	Set %response.Status = ..#HTTP201CREATED
-	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
-	Do resourceToUse.JSONExport()
+	Set %response.ContentType = $PARAMETER(resourceClass, "MEDIATYPE")
+	Set sc = resourceToUse.JSONExport()
+	$$$ThrowOnError(sc)
 
 	Return $$$OK
 }
@@ -538,10 +572,10 @@ ClassMethod CollectionQuery(resourceName As %String) As %Status [ Final ]
 		Return $$$OK
 	}
 	
-	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
+	Set %response.ContentType = $PARAMETER(resourceClass, "MEDIATYPE")
 	
 	Try {
-		Do $ClassMethod(resourceClass, "GetCollection", .params, ..#QuerySelectMode)
+		Do $CLASSMETHOD(resourceClass, "GetCollection", .params, ..#QuerySelectMode)
 	} Catch e {
 		// For well-defined exception types, report appropriately.
 		If e.%IsA("%pkg.isc.rest.exception.queryGenerationException") {
@@ -586,8 +620,8 @@ ClassMethod Retrieve(resourceName As %String, id As %String) As %Status [ Final 
 		Return 1
 	}
 	
-	Set %response.ContentType = $Parameter(resourceClass, "MEDIATYPE")
-	Set resource = $ClassMethod(resourceClass, "GetModelInstance", id)
+	Set %response.ContentType = $PARAMETER(resourceClass, "MEDIATYPE")
+	Set resource = $CLASSMETHOD(resourceClass, "GetModelInstance", id)
 	Quit resource.JSONExport()
 }
 
@@ -626,8 +660,8 @@ ClassMethod Construct(resourceName As %String) As %Status [ Final ]
 		Return 1
 	}
 	
-	Set %response.ContentType = $Parameter(resourceClass,"MEDIATYPE")
-	Set resource = $ClassMethod(resourceClass, "GetModelInstance")
+	Set %response.ContentType = $PARAMETER(resourceClass,"MEDIATYPE")
+	Set resource = $CLASSMETHOD(resourceClass, "GetModelInstance")
 	Quit resource.JSONExport()
 }
 
@@ -667,12 +701,14 @@ ClassMethod Update(resourceName As %String, id As %String) As %Status [ Final ]
 	
 	// Grab the json body from the incoming reqeust
 	Set json = {}.%FromJSON(%request.Content)
-	Set resourceToUse = $ClassMethod(resourceClass, "GetModelInstance", id)
+	Set resourceToUse = $CLASSMETHOD(resourceClass, "GetModelInstance", id)
 	$$$ThrowOnError(resourceToUse.JSONImport(json))
 	Do resourceToUse.SaveModelInstance(userContext)
 	
-	Set %response.ContentType = $Parameter(resourceClass,"MEDIATYPE")
-	Do resourceToUse.JSONExport()
+	Set %response.ContentType = $PARAMETER(resourceClass,"MEDIATYPE")
+	Set sc = resourceToUse.JSONExport()
+	$$$ThrowOnError(sc)
+	
 	Return $$$OK
 }
 
@@ -707,7 +743,7 @@ ClassMethod Delete(resourceName As %String, id As %String) As %Status [ Final ]
 		Return $$$OK
 	}
 	
-	Set deleted = $ClassMethod(resourceClass, "DeleteModelInstance", id)
+	Set deleted = $CLASSMETHOD(resourceClass, "DeleteModelInstance", id)
 	If deleted {
 		Set %response.Status = ..#HTTP204NOCONTENT
 	} Else {
@@ -751,7 +787,7 @@ ClassMethod DispatchClassAction(resourceName As %String, action As %String) As %
 			Do ..ReportHttpStatusCode(..#HTTP403FORBIDDEN, $$$ERROR($$$GeneralError,"Access denied: class "_resourceClass_", "_operation))
 			Quit
 		}
-		Do $ClassMethod(actionClass,"HandleInvokeClassAction", %request.Method, action, userContext)
+		Do $CLASSMETHOD(actionClass,"HandleInvokeClassAction", %request.Method, action, userContext)
 	} Catch err {
 		If err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
 			Do ..ReportHttpStatusCode(err.StatusCode)
@@ -798,8 +834,8 @@ ClassMethod DispatchInstanceAction(resourceName As %String, id As %String, actio
 			Quit
 		}
 		
-		Set resourceInstance = $ClassMethod(resourceClass, "GetModelInstance", id)
-		Do $ClassMethod(actionClass,"HandleInvokeInstanceAction", %request.Method, resourceInstance, action, userContext)
+		Set resourceInstance = $CLASSMETHOD(resourceClass, "GetModelInstance", id)
+		Do $CLASSMETHOD(actionClass,"HandleInvokeInstanceAction", %request.Method, resourceInstance, action, userContext)
 	} Catch err {
 		If err.%IsA("%pkg.isc.rest.exception.httpStatusException") {
 			Do ..ReportHttpStatusCode(err.StatusCode)
@@ -825,51 +861,64 @@ ClassMethod FindActionClass(pResource As %String, pAction As %String, pTarget As
 	
 	Set acceptsList = ..GetMediaTypeListFromAcceptHeader()
 	Set contentType = ..GetMediaTypeFromContentType()
-	If (acceptsList = "") {
-		Set acceptsList = $ListBuild($Char(0))
-	}
 	
-	Set contentTypeList = $ListBuild(contentType)
-	If (contentType '= "") && %request.Content.Size {
-		If '$Match(contentType,..#AllowedMediaTypeRegex) {
-			Do ..ReportHttpStatusCode(..#HTTP415UNSUPPORTEDMEDIATYPE, $$$ERROR($$$GeneralError,"Only JSON-based media types are supported."))
-			Return ""
-		}
-		// Try media type = $c(0) as well as the specified media type if the request content is empty
-		Set contentTypeList = contentTypeList _ $ListBuild($Char(0))
-	} ElseIf (contentType = "") {
-		Set contentTypeList = $ListBuild($Char(0))
-	}
-	
+	Set contentTypeList = $LISTBUILD(contentType, $CHAR(0))
+
 	#dim map As %pkg.isc.rest.actionMap
 	Set map = ##class(%pkg.isc.rest.actionMap).FindActionForRequest(
-		$ClassName(),
+		$CLASSNAME(),
 		pResource,
 		pTarget,
 		acceptsList,
 		contentTypeList,
 		%request.Method,
 		pAction,
-		.hasMatchedAction
+		.hasMatchedAction,
+		.supportedHttpVerbs
 	)
-	If $IsObject(map) {
+	If $ISOBJECT(map) {
 		// Success
 		Set pResourceClass = map.ResourceClass
 		Return map.ImplementationClass
 	}
 	// Naive approach: complain about media type.
-	Set httpStatus = ..#HTTP406NOTACCEPTABLE
 	If hasMatchedAction {
 		// If matched action but not method as well, then complain about invalid method
-		Set httpStatus = ..#HTTP405METHODNOTALLOWED
+		Set %response.Status = ..#HTTP405METHODNOTALLOWED
+		Set %response.ContentType = ..#CONTENTTYPEJSON
+		Set result = { "supportedHttpVerbs": (supportedHttpVerbs) }
+		Do result.%ToJSON()
 	} Else {
-		If (contentType '= "") && (%request.Content.Size > 0) {
-			// Naive approach: complain about media type if it is non-empty
-			Set httpStatus = ..#HTTP415UNSUPPORTEDMEDIATYPE
+		Set supportedTypesArr = ##class(%pkg.isc.rest.actionMap).FindSupportedMediaTypesForRequest(
+			$CLASSNAME(),
+			pResource,
+			pTarget,
+			%request.Method,
+			pAction,
+			.resourceFound,
+			.actionFound
+		)
+		If ('resourceFound) {
+			// No resource found so return 404
+			Do ..ReportHttpStatusCode(..#HTTP404NOTFOUND, $$$ERROR($$$GeneralError,"No resource found"))
+		} ElseIf ('actionFound) {
+			// No action found so return 404
+			Do ..ReportHttpStatusCode(..#HTTP404NOTFOUND, $$$ERROR($$$GeneralError,"No action found"))
+		} Else {
+			// Descriptive info about media types available for the specified resource/action
+			Set httpStatus = ..#HTTP406NOTACCEPTABLE
+			If (contentType '= "") && (%request.Content.Size > 0) {
+				// Naive approach: complain about media type if it is non-empty
+				Set httpStatus = ..#HTTP415UNSUPPORTEDMEDIATYPE
+			}
+			Set %response.Status = httpStatus
+			Set %response.ContentType = ..#CONTENTTYPEJSON
+			Set result = {
+				"supportedTypes": (supportedTypesArr)
+			}
+			Do result.%ToJSON()
 		}
-		// TODO: Descriptive info about media types available for the specified resource/action
 	}
-	Do ..ReportHttpStatusCode(httpStatus)
 	Return ""
 }
 
@@ -882,7 +931,7 @@ ClassMethod FindAcceptedClass(pResource As %String) As %Dictionary.Classname [ F
 ClassMethod FindContentClass(pResource As %String) As %Dictionary.Classname [ Final, Private ]
 {
 	#dim %request As %CSP.Request
-	Quit ..FindClass($ListBuild(..GetMediaTypeFromContentType()),pResource,..#HTTP415UNSUPPORTEDMEDIATYPE)
+	Quit ..FindClass($LISTBUILD(..GetMediaTypeFromContentType()),pResource,..#HTTP415UNSUPPORTEDMEDIATYPE)
 }
 
 ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pStatusWhenInvalid As %String, pLookForDefault As %Boolean = 0) As %Dictionary.Classname [ Final, Private ]
@@ -890,37 +939,53 @@ ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pSt
 	Set pointer = 0
 	Set resourceClass = ""
 	Set foundJSON = 0
-	While $ListNext(pMediaTypeList,pointer,type) {
-		If '$Match(type,..#AllowedMediaTypeRegex) {
+	While $LISTNEXT(pMediaTypeList,pointer,type) {
+		If '$MATCH(type,..#AllowedMediaTypeRegex) {
 			Continue
 		}
 		Set foundJSON = 1
 		
-		If ##class(%pkg.isc.rest.resourceMap).UniqueByContextExists($ClassName(),pResource,type,.id) {
+		If ##class(%pkg.isc.rest.resourceMap).UniqueByContextExists($CLASSNAME(),pResource,type,.id) {
 			Set resourceClass = ##class(%pkg.isc.rest.resourceMap).ResourceClassGetStored(id)
 			Quit
 		}
 	}
 	
-	If pLookForDefault && (resourceClass = "") && ##class(%pkg.isc.rest.resourceMap).UniqueDefaultResourceExists($ClassName(),pResource,1,.id) {
-		Set defaultResourceClass = ##class(%pkg.isc.rest.resourceMap).ResourceClassGetStored(id)
-		Set mediaType = ##class(%pkg.isc.rest.resourceMap).MediaTypeGetStored(id)
-		Set orderedTypeList = ..OrderMediaTypeList(pMediaTypeList)
-		While $ListNext(orderedTypeList,pointer,type) {
-			// Convert accepted media type to RegEx
-			Set regEx = $Replace(type,"*",".*")
-			Set regEx = $Replace(regEx,"+","\+")
-			If $Match(mediaType,regEx) {
-				Set resourceClass = defaultResourceClass
-			}
-		}
+	If pLookForDefault && (resourceClass = "") {
+		Set resourceClass = ##class(%pkg.isc.rest.resourceMap).FindDefaultResourceForRequest($CLASSNAME(), pResource, pMediaTypeList)
 	}
 	
 	If (resourceClass = "") {
-		If ('foundJSON) {
-			Do ..ReportHttpStatusCode(pStatusWhenInvalid, $$$ERROR($$$GeneralError,"Only JSON is supported."))
+		// Look for resource and all of its available media types
+		#dim resultSet As %SQL.StatementResult
+		Set query = "SELECT DISTINCT MediaType FROM %pkg_isc_rest.resourceMap "_
+			"WHERE DispatchClass = ? AND ResourceName = ?"
+		Set resultSet = ##class(%SQL.Statement).%ExecDirect(, query, $CLASSNAME(), pResource)
+		$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
+		Set count = 0
+		#dim mediaTypeArr As %DynamicArray
+		Set mediaTypeArr = []
+		While (resultSet.%Next(.sc)) {
+			$$$ThrowOnError(sc)
+			Do $INCREMENT(count)
+			Do mediaTypeArr.%Push($$$lcase(resultSet.%Get("MediaType")))
+		}
+		$$$ThrowOnError(sc)
+		If (count = 0) {
+			// No resources found matching name
+			Do ..ReportHttpStatusCode(..#HTTP404NOTFOUND, $$$ERROR($$$GeneralError,"No resource found"))
 		} Else {
-			Do ..ReportHttpStatusCode(pStatusWhenInvalid, $$$ERROR($$$GeneralError,"Failed to find resource class."))
+			Set %response.Status = pStatusWhenInvalid
+			Set %response.ContentType = ..#CONTENTTYPEJSON
+			Set errorText = $CASE(foundJSON, 
+				1: "Failed to find matching resource class.",
+				 : "Only JSON is supported."
+			)
+			Set result = {
+				"error": (errorText),
+				"supportedMediaTypes": (mediaTypeArr)
+			}
+			Do result.%ToJSON()
 		}
 	}
 	
@@ -930,14 +995,14 @@ ClassMethod FindClass(pMediaTypeList As %Library.List, pResource As %String, pSt
 ClassMethod OrderMediaTypeList(pList As %List) As %List [ Final, Internal ]
 {
 	Set pointer = 0
-	While $ListNext(pList,pointer,item) {
-		Set order = $Length(item,"*")
-		Set array(order,$Increment(array(order))) = item
+	While $LISTNEXT(pList,pointer,item) {
+		Set order = $LENGTH(item,"*")
+		Set array(order,$INCREMENT(array(order))) = item
 	}
 	Set orderedList = ""
 	For order=1:1:3 {
-		For i=1:1:$Get(array(order)) {
-			Set orderedList = orderedList_$ListBuild(array(order,i))
+		For i=1:1:$GET(array(order)) {
+			Set orderedList = orderedList_$LISTBUILD(array(order,i))
 		}
 	}
 	Quit orderedList
@@ -947,42 +1012,44 @@ ClassMethod GetMediaTypeFromContentType() As %String [ Final, Internal ]
 {
 	// Strip away charset/boundary: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
 	// Strip away leading and trailing white space
-	Return $ZStrip($Piece(%request.ContentType, ";", 1), "<>W")
+	Return $ZSTRIP($PIECE(%request.ContentType, ";", 1), "<>W")
 }
 
 ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Final, Internal ]
 {
 	// Order media types based on q-factor:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept
-	Set types = $ListFromString(%request.GetCgiEnv("HTTP_ACCEPT"),",")
+	Set types = $LISTFROMSTRING(%request.GetCgiEnv("HTTP_ACCEPT"),",")
 	Kill qFactorToTypeArray
-	Set pointer = 0
-	While $ListNext(types,pointer,type) {
+	Set typePtr = 0
+	While $LISTNEXT(types,typePtr,type) {
 		// Strip leading and trailing white space
-		Set resolvedType = $ZStrip($Piece(type,";", 1), "<>W")
-		Set qFactor = $ZStrip($Piece(type,";", 2), "<>W")
+		Set resolvedType = $ZSTRIP($PIECE(type,";", 1), "<>W")
+		// Strip remaining type since stuff other than q factor could be in there. If so, we ignore
+		// it and only handle the q factor
+		Set remainingTypeList = $LISTFROMSTRING($ZSTRIP($PIECE(type,";", 2, *), "<>W"),";")
+		Set remTypePtr = 0
 		// Default is 1
 		Set qFactorValue = 1
-		If (qFactor '= "") {
-			Set qFactorValue = $Piece(qFactor, "=", 2)
-			If '$Match(qFactor, "q=.*") || '$IsValidDouble(qFactorValue,3,0,1) {
-				Set error = $$$ERROR($$$GeneralError,"Invalid Accept header: "_resolvedType)
-				Do ..ReportHttpStatusCode(..#HTTP400BADREQUEST,error)
-				Return ""
+		While $LISTNEXT(remainingTypeList,remTypePtr,remType) {
+			Set remTypeValue = $PIECE(remType, "=", 2)
+			If $MATCH(remType, "q=.*") && $ISVALIDDOUBLE(remTypeValue,3,0,1) {
+				Set qFactorValue = remTypeValue
 			}
 		}
-		Set qFactorValue = qFactorValue * 1000 // Multiply by 1000 to get correct ordering with no decimals in subscripts
-		Set qFactorToTypeArray(qFactorValue) = $Get(qFactorToTypeArray(qFactorValue)) _ $ListBuild(resolvedType)
+		// Multiply by 1000 to get correct ordering with no decimals in subscripts
+		Set qFactorValue = qFactorValue * 1000 
+		Set qFactorToTypeArray(qFactorValue) = $GET(qFactorToTypeArray(qFactorValue)) _ $LISTBUILD(resolvedType)
 	}
 	// Iterate array in reverse order
 	Set list = ""
 	Set key = ""
 	While 1 {
-		Set key = $Order(qFactorToTypeArray(key), -1, value)
+		Set key = $ORDER(qFactorToTypeArray(key), -1, value)
 		If (key = "") {
 			Quit
 		}
-		If ($ListLength(value) = 1) {
+		If ($LISTLENGTH(value) = 1) {
 			// Directly append
 			Set list = list _ value
 		} Else {
@@ -991,6 +1058,12 @@ ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Final, Interna
 			// For now, directly append
 			Set list = list _ value
 		}
+	}
+	If (list = "") {
+		Set list = $LISTBUILD($CHAR(0),"*/*")
+	}
+	If $LISTFIND(list,"*/*") {
+		Set list = list _ $LISTBUILD($CHAR(0))
 	}
 	Return list
 }
@@ -1004,15 +1077,15 @@ ClassMethod GetMediaTypeListFromAcceptHeader() As %Library.List [ Final, Interna
 /// </ul>
 ClassMethod SetLogLevel(pLogLevel As %Integer = 0)
 {
-	Set $$$RESTErrorLogConfigGbl($classname()) = +pLogLevel
+	Set $$$RESTErrorLogConfigGbl($CLASSNAME()) = +pLogLevel
 }
 
 /// Subclasses may override to customize logging. <br />
 /// To suppress error logging, set ^Config("isc","rest","suppressLogging") = 1
 ClassMethod LogErrorStatus(pStatus As %Status)
 {
-	Set isSystemError = $System.Status.GetErrorCodes(pStatus) [ $$$CacheError
-	Set logLevel = $Get($$$RESTErrorLogConfigGbl($classname()),0)
+	Set isSystemError = $SYSTEM.Status.GetErrorCodes(pStatus) [ $$$CacheError
+	Set logLevel = $GET($$$RESTErrorLogConfigGbl($CLASSNAME()),0)
 	If (isSystemError && logLevel) || (logLevel > 1) {
 		Set e = ##class(%Exception.StatusException).CreateFromStatus(pStatus)
 		// Don't log <EXTERNAL INTERRUPT> as it doesn't indicate an application error
@@ -1033,23 +1106,23 @@ ClassMethod ReportHttpStatusCode(pHttpStatus, pSC As %Status = {$$$OK}) As %Stat
 	// If a default HTTP status is supplied, try to be more descriptive.
 	If (pHttpStatus = ..#HTTP500INTERNALSERVERERROR) {
 		// Special cases for pSC:
-		If $System.Status.Equals(pSC,$$$AccessDenied) {
+		If $SYSTEM.Status.Equals(pSC,$$$AccessDenied) {
 			// $$$AccessDenied -> 403 Forbidden
 			Set %response.Status = ..#HTTP403FORBIDDEN
 			Quit $$$OK
-		} ElseIf $System.Status.Equals(pSC,$$$GeneralException) {
+		} ElseIf $SYSTEM.Status.Equals(pSC,$$$GeneralException) {
 			// JSON parsing exception
 			Set %response.Status = ..#HTTP400BADREQUEST
 			Quit $$$OK
-		} ElseIf $System.Status.Equals(pSC,$$$LoadObjectNotFound)
-			|| $System.Status.Equals(pSC,$$$KeyValueNotFoundOpen) {
+		} ElseIf $SYSTEM.Status.Equals(pSC,$$$LoadObjectNotFound)
+			|| $SYSTEM.Status.Equals(pSC,$$$KeyValueNotFoundOpen) {
 			// $$$LoadObjectNotFound -> 404 (GET or anything else) or 409 (PUT)
 			If (%request.Method = "PUT") {
 				Quit ##super(..#HTTP409CONFLICT,pSC)
 			} Else {
 				Quit ##super(..#HTTP404NOTFOUND,pSC)
 			}
-		} ElseIf $System.Status.Equals(pSC,$$$NotImplemented) {
+		} ElseIf $SYSTEM.Status.Equals(pSC,$$$NotImplemented) {
 			// Not implemented means doesn't exist so respond with 404
 			Quit ##super(..#HTTP404NOTFOUND,pSC)
 		}
