@@ -8,18 +8,29 @@
   - [Define an Authentication Strategy](#define-an-authentication-strategy)
   - [Define a User Resource](#define-a-user-resource)
   - [Authentication-related Endpoints](#authentication-related-endpoints)
+  - [Determine REST resources exposed](#determine-rest-resources-exposed)
 - [Defining REST Models](#defining-rest-models)
   - [Accessing Data: Adaptor vs. Proxy](#accessing-data-adaptor-vs-proxy)
     - [%pkg.isc.rest.model.adaptor](#pkgiscrestmodeladaptor)
     - [%pkg.isc.rest.model.proxy](#pkgiscrestmodelproxy)
   - [Accessing Complex/Intertwined Data](#accessing-complexintertwined-data)
+    - [%pkg.isc.rest.model.resource](#pkgiscrestmodelresource)
+    - [%pkg.isc.rest.model.dbMappedResource](#pkgiscrestmodeldbmappedresource)
   - [Defining a Custom Resource](#defining-a-custom-resource)
   - [CRUD and Query Endpoints](#crud-and-query-endpoints)
   - [Actions](#actions)
     - [Action Endpoints](#action-endpoints)
+  - [Defining Actions](#defining-actions)
+  - [Exposing REST Resource in a REST handler](#exposing-rest-resource-in-a-rest-handler)
 - [Permissions](#permissions)
 - [Controlling Endpoints Exposed](#controlling-endpoints-exposed)
 - [Public API Surface](#public-api-surface)
+- [Generated OpenAPI Documentation](#generated-openapi-documentation)
+  - [Retrieving OpenAPI Documentation via ObjectScript Code](#retrieving-openapi-documentation-via-objectscript-code)
+  - [Retrieving OpenAPI Documentation over HTTP](#retrieving-openapi-documentation-over-http)
+  - [Customizing OpenAPI Generation (Advanced)](#customizing-openapi-generation-advanced)
+- [Known Limitations](#known-limitations)
+  - [Actions](#actions-1)
 - [Related Topics in InterSystems Documentation](#related-topics-in-intersystems-documentation)
 
 ## Introduction
@@ -126,6 +137,14 @@ of your authentication strategy class.
 | GET /auth/status | Returns information about the currently-logged-in user, if the user is authenticated, or an HTTP 401 if the user is not authenticated and authentication is required. This is the return value from `GetUserResource()` of the application's `%pkg.isc.rest.handler` subclass serialized to JSON. |
 | POST /auth/logout | Invokes the authentication strategy's Logout method. (No body expected.) |
 
+### Determine REST resources exposed 
+
+At this point you have a REST handler but no REST resource endpoints.
+However, REST resources can only be exposed once they have been created.
+The next section details creation of REST resources and the section on
+[Exposing REST Resource in a REST handler](#exposing-rest-resource-in-a-rest-handler)
+describes how to include it in a REST handler.
+
 <hr>
 
 ## Defining REST Models
@@ -135,7 +154,9 @@ This is done by defining REST resource classes.
 
 ### Accessing Data: Adaptor vs. Proxy
 
-There are two different approaches to exposing persistent data over REST. The "Adaptor" approach provides a single REST representation for the existing `%Persistent` class. The "Proxy" approach provides a REST representation for a *different* `Persistent` class.
+There are two different approaches to exposing persistent data over REST. 
+The "Adaptor" approach provides a single REST representation for the existing `%Persistent` class. 
+The "Proxy" approach provides a REST representation for a *different* `Persistent` class.
 
 #### %pkg.isc.rest.model.adaptor
 
@@ -164,7 +185,18 @@ For an example of using `%pkg.isc.rest.model.proxy`, see:
 
 ### Accessing Complex/Intertwined Data
 
-TODO: Talk about dbMappedResource.
+#### %pkg.isc.rest.model.resource
+
+To expose data that either cannot be mapped nicely to a single persistent class or
+in the case that you want to provide a view across several persistent classes,
+extend `%pkg.isc.rest.model.resource`.
+Then you must override the `RESOURCENAME` parameter as well as any abstract methods you wish to implement.
+
+For an example of using `%pkg.isc.rest.model.resource`, see: 
+[UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/settings.cls)
+
+#### %pkg.isc.rest.model.dbMappedResource
+To expose data that maps to a single %Persistent class, involving significant augmentation or cutting of the JSON that would normally be returned in the response if the %Persistent class were extending `%pkg.isc.rest.model.adaptor`, extend `%pkg.isc.rest.model.dbMappedResource` and overwrite the GeModelFromObject method to populate properties.  
 
 ### Defining a Custom Resource
 
@@ -202,7 +234,9 @@ With resources defined as described above, the following endpoints are available
 | DELETE `/:resource/:id` | Deletes the instance of the resource with the specified ID. |
 
 NOTE: If using the default index of ID, you may want to override the `%JSONINCLUDEID`
-parameter in the persistent class to set it to 1.
+parameter in the persistent class to set it to 1 so that you have the ID available
+from GET/POST requests without an ID to send back for GET/PUT/DELETE requests 
+which require an ID.
 
 ### Actions
 
@@ -233,6 +267,66 @@ If your REST resource has ONLY business logic i.e. no persistence, then extend
 | GET,PUT,POST,DELETE `/:resource/$:action` | Performs the named action on the specified resource. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
 | GET,PUT,POST,DELETE `/:resource/:id/$:action` | Performs the named action on the specified resource instance. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
 
+### Defining Actions
+
+Within the ActionMap XData block, Actions are defined like this:
+
+```XML
+<actions>
+<action name="my-action" target="class" call="MyMethod">
+	<argument name="myURLparam" target="param" source="query"/>
+</action>
+</actions>
+```
+
+The following options, as defined in `%pkg.isc.rest.model.action.t.action`, may be included as xml attributes for each action:
+
+| Action Attribute | Function |
+| ------- | -------- |
+| name | Required. Name of the action, used in URLs. |
+| target | "class" or "instance." Determines whether the action targets the class or an instance of the class. Defaults to "class". Required if query is not defined. |
+| method | The HTTP method to use for the action. Defaults to POST, as this will be most common. | 
+| call | The name of a class/instance method this action should call. May take the format <code>classname:methodname</code> if in a different class. Either *call* or *query* must be defined. |
+| query |  The class query this action should run. May take the form <code>classname:queryname</code> if in a different class. Either *call* or *query* must be defined. |
+| modelClass | For queries, the model class used to project results returned by the query, if different from the source class. |
+
+Each action may include zero or more ```<argument>``` elements, in order to pass variables to its called method or query, as defined in `%pkg.isc.rest.model.action.t.argument`. Each argument element may include the following options as xml attributes:
+
+| Argument Attribute | Function |
+| ------------------ | -------- |
+| name | Name of the parameter (used in URLs). Required for source types *form-data*, *query*, and *path.* | 
+| required | Is this argument required (if missing, treat as client error). 1 or 0, defaults to 0 |
+| target | Required. Name of target argument in method or query definition. |
+| source | Source from the request to pass to the target argument. Options are: body, body-key, form-data, query, path, id, and user-context.  See table below for further details. |
+
+
+| Argument Source Type | Value Passed to Target Argument |
+| ----------- | -------- |
+| body | The entire body content. Can have AT MOST ONE argument with this source. If the target argument type is an instance of `%pkg.isc.rest.model.resource` or is %JSONENABLED, an instance of that class will be created from the body content before passing it as an argument to the corresponding method or class query for the action. See update-home-address in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| body-key | A single key from a JSON body. | 
+| form-data | Multi-part form data, e.g. processing an uploaded file. | 
+| query  | A query parameter in the URL. See find-by-phone in [isc.sample.rest.phonebook.model.Person](../samples/phonebook/cls/isc/sample/rest/phonebook/model/Person.cls). | 
+| path  | A path parameter from the URL for actions with target = "instance". MUST also be present with a colon in the URL, matching the same name e.g. if the URL path for the action is `/example/:ex`, then the argument name MUST be `ex`. See path-param in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| id  | Resource id from the URL for actions with target = "instance". See update-home-address in [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls). | 
+| user-context | Logged-in user as defined by [GetUserResource](#define-a-user-resource) in subclasses of ```%pkg.isc.rest.handler``` |
+
+### Exposing REST Resource in a REST handler
+
+Now that a REST resource class has been created (i.e. a class extending a `%pkg.isc.rest.model.*` class),
+you may want to expose it in a specific REST handler.
+To do so, override the `CheckResourcePermitted()` method in your subclass of `%pkg.isc.rest.handler`.
+This method takes a resource class name as an argument and returns a boolean value 
+indicating whether that resource class should be exposed as a part of the REST handler.
+
+A REST resource class can be exposed in multiple REST handlers.
+
+NOTE: `CheckResourcePermitted()` is invoked at compilation time to tie REST resource 
+classes to their corresponding REST handler classes so no runtime logic should be 
+present here.
+
+An example is present in [UnitTest.isc.rest.sample.handler](../internal/testing/unit_tests/UnitTest/isc/rest/sample/handler.cls).
+
+
 ## Permissions
 
 Irrespective of the type of resource class, you must override the `CheckPermission()`
@@ -256,18 +350,72 @@ ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext 
 
 ## Controlling Endpoints Exposed
 
-There are many available endpoints in the UrlMap of `%pkg.isc.rest.handler`.
-However, you may not want all such endpoints available for your API i.e. some 
-endpoints should be removed so that requests receive a 404 Not Found error.
+While `CheckResourcePermitted()` mentioned in the above [section](#exposing-rest-resource-in-a-rest-handler)
+only allows for compile time checks to determine whether a REST resource is exposed 
+as part of a REST handler, there are also runtime hooks available.
 
-There are two levels of doing so - the dispatch class level and the resource level.
+The following sets of endpoints are exposed in a REST handler:
+- [Authentication Related Endpoints](#authentication-related-endpoints)
+- [CRUD and Query Endpoints](#crud-and-query-endpoints)
+- [Action Endpoints](#action-endpoints)
 
-In both cases, `%pkg.isc.rest.handler` and `%pkg.isc.rest.resource` respectively
-have a method called `Supports`. This method is called on every request to determine 
-if the request is supported. If it returns false, then a 404 error is returned.
-By default, all dispatch class-level routes are supported and for resources,
-all implemented routes are supported (some may not have been implemented when 
-[defining a custom resource](#defining-a-custom-resource)).
+The first of those can be restricted via overriding the `Supports()` method in your 
+REST handler class i.e. a subclass of `%pkg.isc.rest.handler`.
+Here is the method signature:
+
+```
+/// Checks if the endpoint provided is supported for the current dispatch class.
+/// If the method returns 0 for a given endpoint, requests to the endpoint will
+/// get a 404 and the endpoint will be excluded from the Open API specification. <br />
+/// Default behavior is to return 1 for all endpoints. <br />
+/// <var>pEndpoint</var> can be one of the endpoint-http verb combinations present
+/// in <parameter>SupportsCheckEndpoints</parameter>. <br />
+/// <var>pHTTPVerb</var> is the HTTP verb for the endpoint. <br />
+/// <var>pRequest</var> is the request object in an HTTP context. <br />
+ClassMethod Supports(
+	pEndpoint As %String,
+	pHTTPVerb As %String,
+	pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
+{
+	Return 1
+}
+```
+
+This method can be implemented to remove authentication related endpoints from 
+the REST handler by returning 0 for those endpoints i.e. attempts to access the
+endpoints will result in a 404 HTTP status code.
+
+For the second and third sets of endpoints, an equivalent `Supports()` method can 
+be overridden in your subclass of any `%pkg.isc.rest.model.*` class.
+Here is the default implementation of the method in `%pkg.isc.rest.model.resource`:
+
+```
+/// Checks if the particular operation is supported for this resource. <br />
+/// Look at documentation of <method>SupportsDefault</method> for default behavior
+/// of this method. <br />
+/// If the method returns 0, the corresponding dispatch class will return a 404
+/// Not Found status when the operation is invoked. <br />
+/// NOTE: This method runs on EVERY request so should be quick, lightweight checks
+/// to prevent performance bottlenecks. <br />
+/// <var>pOperation</var> may be one of the macros of the form $$$Operation*
+/// present in %pkg.isc.rest.general.inc. <br />
+/// <var>pType</var> is the type of the operation (instance-level on a particular
+/// record or class-level). <br />
+/// <var>pRequest</var> is the request object in an HTTP context.
+/// NOTE: MUST check that this is an object before using it as it may be passed
+/// as a NULL OREF in some cases. <br />
+ClassMethod Supports(
+	pOperation As %String,
+	pType As %String(VALUELIST=",instance,class"),
+	pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
+{
+	Return ..SupportsDefault(pOperation, pType)
+}
+```
+
+Similar to the prior `Supports()` method at the REST handler level, whenever this 
+method returns 0 for a given endpoint, the endpoint is removed from the REST handler 
+i.e. attempts to access the endpoints will result in a 404 HTTP status code.
 
 ## Public API Surface
 
@@ -287,6 +435,77 @@ on the classes:
 
 Only the following include files should be directly used by consuming applications:
 - `%pkg.isc.rest.general`
+
+## Generated OpenAPI Documentation
+isc.rest supports generating OpenAPI documentation via REST and code APIs. A separate IPM package, [isc.ipm.js](https://github.com/intersystems/isc-ipm-js/blob/main/docs/user-guide.md#openapi-based-client-code-generation), takes this a step further to enable generation of client code using additional third-party libraries. If the end goal is to generate client code, start with isc.ipm.js.
+
+### Retrieving OpenAPI Documentation via ObjectScript Code
+To build and output OpenAPI documentation for your isc.rest-based API from ObjectScript, call the `ConsoleBuildOpenAPIDocumentation` method in your REST dispatch class. For example, the following ObjectScript method could be called to output OpenAPI documentation for the "phonebook" sample application included in the isc.rest repo:
+
+```
+Class DC.Demo.OpenAPIGen
+{
+ 
+ClassMethod Run(toFile As %String = "openapi.json") As %Status
+{
+	Set sc = $$$OK
+	Try {
+		Set sc = ##class(isc.sample.rest.phonebook.rest.Handler).ConsoleBuildOpenAPIDocumentation(
+			"/csp/user/phonebook-sample/api/",,,.response,
+			"https://mycustomendpoint.com/csp/user/phonebook-sample/api/")
+		$$$ThrowOnError(sc)
+ 
+		Set targetFile = ##class(%Library.File).NormalizeFilename(toFile)
+		Do ##class(%Library.File).CreateDirectoryChain(##class(%Library.File).GetDirectory(targetFile))
+ 
+		Set stream = ##class(%Stream.FileCharacter).%OpenId(targetFile)
+		$$$ThrowOnError(response.%JSONExportToString(.jsonString))
+		$$$ThrowOnError(##class(%pkg.isc.json.formatter).%New().FormatToStream(jsonString,stream))
+		$$$ThrowOnError(stream.%Save())
+	} Catch e {
+		Set sc = e.AsStatus()
+	}
+	If $$$ISERR(sc) && '$Quit {
+		Write !,$System.Status.GetErrorText(sc)
+	}
+	Quit sc
+}
+ 
+}
+```
+
+In this example:
+* "/csp/user/phonebook-sample/api/" is the IRIS web application for which an OpenAPI spec will be generated. (The same REST dispatch class could be enabled for multiple web applications, so the web application must be specified.)
+* `response` (output argument) contains a JSON-enabled object with the OpenAPI specification
+* "https://mycustomendpoint.com/csp/user/phonebook-sample/api/" is listed in the `servers` section of the OpenAPI spec.
+
+### Retrieving OpenAPI Documentation over HTTP
+Subclasses of `%pkg.isc.rest.handler` also support generation and retrieval of OpenAPI specifications over HTTP. For security purposes, this is disabled by default. To enable it, override `CheckPermission` in a `%pkg.isc.rest.handler` subclass and handle the endpoint / user context the same way as in a REST resource class.
+
+Endpoints for OpenAPI documentation generation/retrieval are:
+* `POST /build-documentation`: Starts OpenAPI generation (in a background process - it can take a while!)
+* `GET /build-documentation`: Returns current status of OpenAPI generation process
+* `GET /openapi.json`: Returns the latest version of the generated OpenAPI spec
+
+### Customizing OpenAPI Generation (Advanced)
+There are two ways to customize the OpenAPI documentation generated for an isc.rest API:
+
+* Overriding the method `ModifyOpenAPIInfo` in a REST resource class (to modify schemas and endpoints specific to that resource)
+* Overriding the method `ModifyOpenAPISpecification` in a subclass of `%pkg.isc.rest.handler` (with access to the entire spec)
+
+For more details, consult the class reference in your IRIS instance for the methods and classes in question.
+
+## Known Limitations
+
+### Actions
+
+- Actions only support the following return types as of now (i.e. any instance/class
+methods that are invoked as part of the ActionMap XData block):
+  - `%Status`
+  - `%DynamicAbstractObject` and its subclasses
+  - Any JSON serializable class i.e. one that extends either `%pkg.isc.json.adaptor` and `%JSON.Adaptor`
+- You cannot select which JSON mapping of a JSON serializable class to use when
+projecting it to JSON.
 
 ## Related Topics in InterSystems Documentation
 
