@@ -43,6 +43,10 @@
           <Attribute Name="Format">UDL</Attribute>
         </ProcessorDefault>
       </Defaults>
+      <Invoke Class="%pkg.isc.rest.installer" Method="HandleMockTests" Phase="Test" When="Before">
+      </Invoke>
+      <Invoke Class="%pkg.isc.rest.installer" Method="CleanupMockTests" Phase="Test" When="After">
+      </Invoke>
     </Module>
   </Document>
 </Export>
