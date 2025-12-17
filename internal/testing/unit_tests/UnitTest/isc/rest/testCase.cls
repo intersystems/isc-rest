@@ -71,6 +71,7 @@ Method OnAfterAllTests() As %Status
 /// Ensure we start from a clean slate on each test
 Method OnBeforeOneTest(testname As %String) As %Status
 {
+	Do ##super()
 	Quit $System.OBJ.DeletePackage("zUnitTest.isc.rest","-d")
 }
 
@@ -113,8 +114,8 @@ Method Request(pVerb As %String, pRoute As %String, ByRef pRequest As %CSP.Reque
 	Set buffer = ##class(%pkg.isc.json.util.buffer).%New()
 	Set sc = buffer.BeginCaptureOutput()
 	$$$ThrowOnError(sc)
-	If $Extract(pRoute) = "/" {
-		Set pRoute = $Extract(pRoute,2,*)
+	If $Extract(pRoute) '= "/" {
+		Set pRoute = "/"_pRoute
 	}
 	
 	// Try/Catch and error handling matches %CSP.REST:Page behavior
@@ -521,4 +522,3 @@ Method VerifyJSON(obj, sub, err, assert = 1) As %Boolean
 }
 
 }
-

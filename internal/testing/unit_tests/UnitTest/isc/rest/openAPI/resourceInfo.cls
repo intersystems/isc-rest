@@ -133,13 +133,7 @@ Method TestSimpleTest()
 	Do ..VerifyJSON(outputSchemaJSON, {
 			"type": "object",
 			"description": "Description of class 1",
-			"required": [
-				"_id"
-			],
 			"properties": {
-				"_id": {
-					"type": "string"
-				},
 				"xdata3-property": {
 					"type": "boolean",
 					"description": "testProp class2 Description"

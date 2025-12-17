@@ -10,6 +10,15 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 	Set initTLevel = $TLevel
 	Set sc = $$$OK
 	Try {
+		// Confirm authentication strategy extends base class
+		If ('$$$defClassKeyGet(classname,$$$cCLASSabstract)) {
+			Set baseStrategyClass = "%pkg.isc.rest.authentication"
+			Set strategyClass = $ClassMethod(classname, "AuthenticationStrategy")
+			If '$System.CLS.IsMthd(classname, "%Extends") || '$ClassMethod(strategyClass, "%Extends", baseStrategyClass) {
+				Set msg = $$$FormatText("Authentication strategy class %1 for dispatch class %2 MUST extend %3",strategyClass,classname,baseStrategyClass)
+				$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
+			}
+		}
 		TSTART
 		Set permittedClasses = ""
 		Set resourceClasses = ##class(%Dictionary.ClassDefinition).SubclassOfFunc("%pkg.isc.rest.model.resource")
@@ -114,7 +123,7 @@ ClassMethod AddPermittedClass(handlerClass As %Dictionary.Classname, resourceCla
 	$$$ThrowOnError(target.%Save())
 	
 	// Insert/update actionMap (update should always be a no-op)
-	&sql(insert or update into %pkg_isc_rest.actionMap
+	&sql(insert or update %NOLOCK into %pkg_isc_rest.actionMap
 		(DispatchClass, ResourceName, ActionName, ActionTarget, HTTPVerb, MediaType, Accepts, ResourceClass, ImplementationClass)
 		select :handlerClass, ResourceName, ActionName, ActionTarget, HTTPVerb, MediaType, Accepts, ResourceClass, ImplementationClass
 		from %pkg_isc_rest.actionMap

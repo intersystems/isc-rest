@@ -16,6 +16,13 @@ Parameter MEDIATYPE As STRING = "application/json";
 /// given MEDIATYPE=application/json, a GET request for this resource name will match if Accept is set to */* or application/*
 Parameter DEFAULT As BOOLEAN;
 
+/// Security resource used to protect this REST resource. <br />
+/// If provided, then any READ or QUERY operations require READ access to the resource and
+/// any Create, Update or Delete operations require WRITE access to the resource. <br />
+/// This parameter is used in the default implementation of <method>CheckPermission</method> below.
+/// If more advanced permission checking is needed, the method can be overridden. <br />
+Parameter SecurityResource As STRING;
+
 /// Maintains data in <class>%pkg.isc.rest.resourceMap</class> for this class.
 Projection ResourceMap As %pkg.isc.rest.model.resourceMapProjection;
 
@@ -57,7 +64,17 @@ ClassMethod GetCollection(ByRef params, selectMode As %Integer) [ Abstract ]
 /// <var>pUserContext</var> is supplied by <method>GetUserContext</method>. <br />
 ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext As %RegisteredObject, ByRef URLParams) As %Boolean
 {
-	Return 0
+	Set resource = ..#SecurityResource
+    If (resource = "") {
+        Return 0
+    }
+	If (pOperation = $$$OperationQuery) || (pOperation = $$$OperationRead) {
+        Return $System.Security.Check(resource,"R")
+    }
+    If (pOperation = $$$OperationCreate) || (pOperation = $$$OperationUpdate) || (pOperation = $$$OperationDelete) {
+        Return $System.Security.Check(resource,"W")
+    }
+    Return 0
 }
 
 /// Checks if the particular operation is supported for this resource. <br />

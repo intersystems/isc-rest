@@ -25,10 +25,14 @@ Property call As %String(MAXLEN = 2000, XMLPROJECTION = "attribute");
 Property query As %String(MAXLEN = 2000, XMLPROJECTION = "attribute");
 
 /// The method to use for the action. Defaults to POST, as this will be most common.
-Property method As %String(VALUELIST = ",GET,POST,PUT,DELETE", XMLPROJECTION = "attribute") [ InitialExpression = "POST", Required ];
+Property method As %String(VALUELIST = ",GET,POST,PUT,DELETE,PATCH", XMLPROJECTION = "attribute") [ InitialExpression = "POST", Required ];
 
 /// For queries, the model class of result instances (if different from the source class)
 Property modelClass As %Dictionary.CacheClassname(XMLPROJECTION = "attribute");
+
+/// Provide an explicit expectation of what the Content-Type header is, overriding any inferred
+/// content type based on the input arguments.
+Property contentType As %String(MAXLEN = 128, XMLPROJECTION = "attribute");
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to 
 /// provide notification that the current object is being validated.
@@ -40,6 +44,13 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		// If call and query are both empty or both nonempty, we have a problem.
 		Set msg = $$$FormatText("Action %1: must specify either a call or a query to use.",..name)
 		Return $$$ERROR($$$GeneralError,msg)
+	}
+
+	If (..method = "GET") {
+		If (..contentType '= "") {
+			Set msg = $$$FormatText("Action %1: GET request cannot set Content-Type since it has no body",..name)
+			Return $$$ERROR($$$GeneralError,msg)
+		}
 	}
 	
 	If (..query '= "") {
@@ -92,12 +103,25 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 			// name can be empty for singelton arguments like body
 			Set argName = $Char(0)
 		}
+		If (argTarget = "") {
+			// target can only be empty for body-key
+			If (argSource '= "body-key") {
+				Set msg = $$$FormatText("Action %1: Argument %2 must have a target",..name,argName)
+				Return $$$ERROR($$$GeneralError,msg)
+			}
+		}
 		If (argSource = "body") {
 			If (seenBodyArgument) {
 				Set msg = $$$FormatText("Action %1: Can only have single argument of source = 'body' but multiple present",..name)
 				Return $$$ERROR($$$GeneralError,msg)
 			}
 			Set seenBodyArgument = 1
+		}
+		If (argSource = "body") || (argSource = "body-key") {
+			If (..method = "GET") {
+				Set msg = $$$FormatText("Action %1: GET requests cannot have a request body",..name)
+				Return $$$ERROR($$$GeneralError,msg)
+			}
 		}
 		// Check if name + source combination already seen (this combination must be unique)
 		If $Data(nameSourceArray(argName,argSource))#2 {
@@ -211,6 +235,7 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 	Set pExpectedContentType = ""
 	Set pResultContentType = ""
 	Set tResultClass = pSourceClass
+	Set jsonMediaType = ##class(%CSP.REST).#CONTENTTYPEJSON
 	Do ..GetFormalSpecMap(.tResultClass, .class, .method, .argArray, .nameMap, .returnType)
 	$$$GENERATE("// "_..method_" $"_..name)
 
@@ -252,6 +277,10 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 			$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
 		}
 		Set argType = $ListGet(argArray(position),2)
+		If (argType = "") {
+			Set msg = $$$FormatText("Action %1: has argument without a type but types are required for all arguments",..name)
+			$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
+		}
 		If (argument.source = "query") {
 			If (argument.required) {
 				$$$GENERATE("Set args("_position_") = %request.Get("_$$$QUOTE(argument.name)_")")
@@ -303,20 +332,25 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 				Set generatedBodyFromJSON = 1
 			}
 			If $ClassMethod(argType,"%Extends","%Library.DynamicAbstractObject") {
-				Set pExpectedContentType = "application/json"
+				Set pExpectedContentType = jsonMediaType
 				$$$GENERATE(tab_"Set args("_position_") = "_source)
 			} ElseIf $ClassMethod(argType,"%Extends","%pkg.isc.rest.model.resource") {
-				Set pExpectedContentType = $Case(argument.source,"body":$Parameter(argType,"MEDIATYPE"),:"application/json")
+				Set pExpectedContentType = $Case(argument.source,"body":$Parameter(argType,"MEDIATYPE"),:jsonMediaType)
 				$$$GENERATE(tab_"Set model = ##class("_argType_").GetModelInstance()")
 				$$$GENERATE(tab_"$$$ThrowOnError(model.JSONImport("_source_"))")
 				$$$GENERATE(tab_"Set args("_position_") = model")
+			} ElseIf $ClassMethod(argType,"%Extends","%pkg.isc.rest.model.iSerializable") {
+				Set pExpectedContentType = $Case(argument.source,"body":$Parameter(argType,"MEDIATYPE"),:jsonMediaType)
+				$$$GENERATE(tab_"Set model = ##class("_argType_").%New()")
+				$$$GENERATE(tab_"$$$ThrowOnError(model.JSONImport("_source_"))")
+				$$$GENERATE(tab_"Set args("_position_") = model")
 			} ElseIf $Parameter(argType,"%JSONENABLED") {
-				Set pExpectedContentType = "application/json"
+				Set pExpectedContentType = jsonMediaType
 				$$$GENERATE(tab_"Set model = ##class("_argType_").%New()")
 				$$$GENERATE(tab_"$$$ThrowOnError(model.%JSONImport("_source_"))")
 				$$$GENERATE(tab_"Set args("_position_") = model")
 			} ElseIf (argument.name '= "") {
-				Set pExpectedContentType = "application/json"
+				Set pExpectedContentType = jsonMediaType
 				$$$GENERATE(tab_"Set args("_position_") = "_source)
 			}
 			If ('argument.required) {
@@ -341,6 +375,9 @@ Method Generate(pSourceClass As %String, Output pCodeArray, Output pExpectedCont
 		} ElseIf (argument.source = "user-context") {
 			$$$GENERATE("Merge args("_position_") = pUserContext")
 		}
+	}
+	If (..contentType '= "") {
+		Set pExpectedContentType = ..contentType
 	}
 	
 	Set resultVariableName = "result"
@@ -382,6 +419,7 @@ Method ComputeExportCommandList(pResultVariableName As %String, pReturnType As %
 	Set pResultContentType = ""
 	Set exportCommandList = ""
 	Set classType = $$$comClassKeyGet(pReturnType,$$$cCLASSclasstype)
+	Set jsonMediaType = ##class(%CSP.REST).#CONTENTTYPEJSON
 	Set unknownReturnTypeError = "Unknown handling for return type: " _ $$$QUOTE(pReturnType) _ " for action " _ $$$QUOTE(..name)
 	If (classType = $$$cCLASSCLASSTYPEDATATYPE) {
 		// Data types
@@ -412,9 +450,9 @@ Method ComputeExportCommandList(pResultVariableName As %String, pReturnType As %
 			} Else {
 				// Singular Objects i.e. not collections
 				If $ClassMethod(pReturnType,"%Extends","%Library.DynamicAbstractObject") {
-					Set pResultContentType = "application/json"
+					Set pResultContentType = jsonMediaType
 					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%ToJSON()")
-				} ElseIf $ClassMethod(pReturnType,"%Extends","%pkg.isc.rest.model.resource") {
+				} ElseIf $ClassMethod(pReturnType,"%Extends","%pkg.isc.rest.model.iSerializable") {
 					Set pResultContentType = $Parameter(pReturnType,"MEDIATYPE")
 					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".JSONExport()")
 				} ElseIf $ClassMethod(pReturnType,"%Extends","%pkg.isc.rest.model.queryResult") {
@@ -431,7 +469,7 @@ Method ComputeExportCommandList(pResultVariableName As %String, pReturnType As %
 					Set pResultContentType = "application/octet-stream"
 					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".OutputToDevice()")
 				} ElseIf $Parameter(pReturnType,"%JSONENABLED") {
-					Set pResultContentType = "application/json"
+					Set pResultContentType = jsonMediaType
 					Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%JSONExport()")
 				} Else {
 					$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))
@@ -439,7 +477,7 @@ Method ComputeExportCommandList(pResultVariableName As %String, pReturnType As %
 			}
 		} Else {
 			If $Parameter(pReturnType,"%JSONENABLED") {
-				Set pResultContentType = "application/json"
+				Set pResultContentType = jsonMediaType
 				Set exportCommandList = $ListBuild("Do "_pResultVariableName_".%JSONExport()")
 			} Else {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,unknownReturnTypeError))

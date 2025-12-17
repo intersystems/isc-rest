@@ -101,6 +101,16 @@ Method TestPerson021GetDefault()
     Set ..Person = object
 }
 
+Method TestPerson022GetDefaultEmptyAccept()
+{
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Do ..Request("GET", "person/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+    Set ..Person = object
+}
+
 Method TestPerson03Put()
 {
     Set name = "Rubble, Barney"
@@ -147,20 +157,32 @@ Method TestPerson05ListByName()
     Do $$$AssertEquals(object.%Size(), 1)
 }
 
+Method TestPerson051ListByNameEmptyAccept()
+{
+    Set name = "Flintstone, Fred"
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.Data("name", 1) = "Flintstone"
+    Do ..Request("GET", "person/$list-by-name", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+    Do $$$AssertEquals(object.%Size(), 1)
+}
+
 Method TestPerson06UpdateHomeAddress()
 {
     Set zip = "12345"
     #dim request As %CSP.Request
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
-    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
-    Set request.ContentType = ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE
+    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE
+    Set request.ContentType = ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE
     // Even though string isn't used, write to it to ensure %ToJSON doesn't write to current device
     Set stream = ##class(%Stream.TmpCharacter).%New()
     Set string = {"Zip": (zip)}.%ToJSON(.stream)
     Set request.Content = stream
     Do ..Request("PUT", "person/201/$update-home-address", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
-    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+    Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE)
     Do $$$AssertEquals(object.Zip,"12345")
 }
 
@@ -170,7 +192,7 @@ Method TestPerson07UpdateOfficeAddress()
     #dim request As %CSP.Request
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
-    Set request.ContentType = ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE
+    Set request.ContentType = ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE
     // Even though string isn't used, write to it to ensure %ToJSON doesn't write to current device
     Set stream = ##class(%Stream.TmpCharacter).%New()
     Set string = {"Zip": (zip)}.%ToJSON(.stream)
@@ -316,6 +338,22 @@ Method TestSettings1UserExpandedInfo()
     Do $$$AssertEquals(object.UsernameUpper,$ZConvert($Username,"U"))
 }
 
+Method TestSettings2PatchTimeout()
+{
+    Set timeout = 120
+    #dim request As %CSP.Request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
+    Set request.ContentType = ##class(UnitTest.isc.rest.sample.model.settings).#MEDIATYPE
+    Set stream = ##class(%Stream.TmpCharacter).%New()
+    Set string = {"timeout": (timeout)}.%ToJSON(.stream)
+    Set request.Content = stream
+    Do ..Request("PATCH", "settings/$timeout", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(response.ContentType, "application/json")
+    Do $$$AssertEquals(timeout,object.timeout,"PATCH request successfully processed.")
+}
+
 Method TestBad01InvalidOrderBy()
 {
     #dim request As %CSP.Request
@@ -324,7 +362,8 @@ Method TestBad01InvalidOrderBy()
     Set request.Data("$orderBy", 1) = "-SSN"
     Do ..Request("GET", "person", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
-    Do $$$AssertEquals(object.errors.%Get(0).params.%Get(0), "Invalid query. Column 'SSN' does not exist.")
+    Set errorText = "Invalid query. Column 'SSN' does not exist."
+    Do $$$AssertEquals(object.errors.%Get(0).params.%Get(0), $ZConvert(errorText, "O", "HTML"))
 }
 
 Method TestBad02MalformedFilter()
@@ -336,7 +375,8 @@ Method TestBad02MalformedFilter()
     Do ..Request("GET", "person", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
     Do $$$AssertEquals(response.ContentType, ##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
-    Do $$$AssertEquals(object.errors.%Get(0).params.%Get(0), "Invalid query. The parameter value 'name[foo]=Fred' could not be parsed.")
+    Set errorText =  "Invalid query. The parameter value 'name[foo]=Fred' could not be parsed."
+    Do $$$AssertEquals(object.errors.%Get(0).params.%Get(0),$ZConvert(errorText, "O", "HTML"))
 }
 
 Method TestBad03NoResource()
@@ -346,29 +386,35 @@ Method TestBad03NoResource()
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("GET", "vehicle", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
     Do $$$AssertEquals(response.ContentType, ##class(%CSP.REST).#CONTENTTYPEJSON)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("GET", "vehicle/1", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
     Do $$$AssertEquals(response.ContentType, ##class(%CSP.REST).#CONTENTTYPEJSON)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("PUT", "vehicle/1", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("POST", "vehicle", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("DELETE", "vehicle/1", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+    Do $$$AssertEquals(response.ContentType, ##class(%CSP.REST).#CONTENTTYPEJSON)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
+    Do ..Request("DELETE", "vehicle/1/$test", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
     Do $$$AssertEquals(response.ContentType, ##class(%CSP.REST).#CONTENTTYPEJSON)
 }
 
@@ -378,31 +424,33 @@ Method TestBad04NoAction()
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
     Do ..Request("GET", "person/1/$promote", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
 }
 
 Method TestBad05WrongActionMethod()
 {
     #dim request As %CSP.Request
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
-    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(%CSP.REST).#CONTENTTYPEJSON
-    Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
-    // Even though string isn't used, write to it to ensure %ToJSON doesn't write to current device
+    Set request.CgiEnvs("HTTP_ACCEPT") = ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE
+    Set request.ContentType = ##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE
     Set stream = ##class(%Stream.TmpCharacter).%New()
-    Set string = {"Zip":"12345"}.%ToJSON(.stream)
+    Set payload = {"Zip":"12345"}
+    Do payload.%ToJSON(.stream)
     Set request.Content = stream
     Do ..Request("POST", "person/1/$update-home-address", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP405METHODNOTALLOWED)
+    Do $$$AssertEquals(response.ContentType, ##class(%CSP.REST).#CONTENTTYPEJSON)
+    Do $$$AssertEquals(object.supportedHttpVerbs.%ToJSON(), ["PUT"].%ToJSON())
 }
 
 Method TestBad06MalformedJSON()
 {
+    // No "data"
     #dim request As %CSP.Request
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = ##class(%CSP.REST).#CONTENTTYPEJSON
-    // No "data"
     Do ..Request("PUT", "person/1", .request, .response, .object)
-    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP400BADREQUEST)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP500INTERNALSERVERERROR)
 }
 
 Method TestBad07NoObject()
@@ -426,28 +474,68 @@ Method TestBad07NoObject()
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP409CONFLICT)
 }
 
-Method TestBad08NonJSONTypes()
+Method TestBad08MediaTypesInRequest()
 {
     #dim request As %CSP.Request
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/test+json"
+    Do ..Request("GET", "person/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status,##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.ContentType,##class(%CSP.REST).#CONTENTTYPEJSON)
+    Set expectedResult = {
+        "error": "Failed to find matching resource class.",
+        "supportedMediaTypes": [
+            (##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+        ]
+    }
+    Do $$$AssertEquals(object.%ToJSON(),expectedResult.%ToJSON())
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.CgiEnvs("HTTP_ACCEPT") = "application/xml"
     Do ..Request("GET", "person/1", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.ContentType,##class(%CSP.REST).#CONTENTTYPEJSON)
+    Set expectedResult = {
+        "error": "Only JSON is supported.",
+        "supportedMediaTypes": [
+            (##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE)
+        ]
+    }
+    Do $$$AssertEquals(object.%ToJSON(),expectedResult.%ToJSON())
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = "application/xml"
-    // Even though string isn't used, write to it to ensure %ToJSON doesn't write to current device
     Set stream = ##class(%Stream.TmpCharacter).%New()
     Do stream.Write("<foo />")
     Set request.Content = stream
-    Do ..Request("PUT", "person/1/$update-home-address", .request, .response, .object)
+    Do ..Request("POST", "person/1/$update-office-address", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP415UNSUPPORTEDMEDIATYPE)
+    Do $$$AssertEquals(response.ContentType,##class(%CSP.REST).#CONTENTTYPEJSON)
+    Set expectedResult = {
+        "supportedTypes": [
+            {
+                "accepts": (##class(UnitTest.isc.rest.sample.model.person).#MEDIATYPE),
+                "contentType": (##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE)
+            }
+        ]
+    }
+    Do $$$AssertEquals(object.%ToJSON(),expectedResult.%ToJSON())
 
     Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
     Set request.ContentType = "application/xml"
     Do ..Request("PUT", "person/1/$update-home-address", .request, .response, .object)
     Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP406NOTACCEPTABLE)
+    Do $$$AssertEquals(response.ContentType,##class(%CSP.REST).#CONTENTTYPEJSON)
+    Set expectedResult = {
+        "supportedTypes": [
+            {
+                "accepts": (##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE),
+                "contentType": (##class(UnitTest.isc.rest.sample.data.address).#MEDIATYPE)
+            }
+        ]
+    }
+    Do $$$AssertEquals(object.%ToJSON(),expectedResult.%ToJSON())
 }
 
 /// Confirm that the /auth endpoints are not accessible but the
@@ -567,6 +655,63 @@ Method TestOrderMediaTypeList()
 	Do $$$AssertEquals($$$order($lb("application/*","application/foo+bar.json")),$lb("application/foo+bar.json","application/*"))
 	Do $$$AssertEquals($$$order($lb("*/*","application/*")),$lb("application/*","*/*"))
 	Do $$$AssertEquals($$$order($lb("application/foo+bar.json","*/*","application/json")),$lb("application/foo+bar.json","application/json","*/*"))
+}
+
+Method TestSingletonResourceModel()
+{
+    #dim request As %CSP.Request
+
+    // Vanilla GET request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "settings-with-singleton", .request, .response, .object)
+    Do $$$LogMessage("Vanilla GET")
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(object.timeout, 90)
+    Do $$$AssertEquals(object.unauthenticatedEnabled, 0)
+    Do $$$AssertEquals(object.systemMode, "Test")
+
+    // Vanilla POST request
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set stream = ##class(%Stream.TmpCharacter).%New()
+    Set string = {"timeout": (300)}.%ToJSON(.stream)
+    Set request.Content = stream
+    Set request.ContentType = "application/json"
+    Do ..Request("POST", "settings-with-singleton", .request, .response, .object, .raw)
+    Do $$$LogMessage("Vanilla POST")
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP201CREATED)
+    Do $$$AssertEquals(object.timeout, 300)
+    Do $$$AssertEquals(object.unauthenticatedEnabled, 0)
+    Do $$$AssertEquals(object.systemMode, "Test")
+
+    // Confirm no instance level request supported
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do ..Request("GET", "settings-with-singleton/1", .request, .response, .object)
+    Do $$$LogMessage("Confirm instance GET not supported")
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do $$$LogMessage("Confirm instance PUT not supported")
+    Do ..Request("PUT", "settings-with-singleton/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.ContentType = "application/json"
+    Do $$$LogMessage("Confirm instance DELETE not supported")
+    Do ..Request("DELETE", "settings-with-singleton/1", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP404NOTFOUND)
+
+    // Confirm actions supported
+    Set request = ..mock("%CSP.Request", ..#CALLSREALMETHODS)
+    Set request.CgiEnvs("HTTP_ACCEPT") = "application/json"
+    Do $$$LogMessage("Confirm class ACTION $new supported")
+    Do ..Request("GET", "settings-with-singleton/$new", .request, .response, .object)
+    Do $$$AssertEquals(response.Status, ##class(%CSP.REST).#HTTP200OK)
+    Do $$$AssertEquals(object.timeout, 90)
+    Do $$$AssertEquals(object.unauthenticatedEnabled, 0)
+    Do $$$AssertEquals(object.systemMode, "Test")
 }
 
 }

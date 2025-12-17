@@ -121,10 +121,12 @@ ClassMethod FromStub(stub As %pkg.isc.rest.openAPI.resourceInfoStub, openapi As 
 	Set info.Description = classInfo.Description
 	
 	// Decide if this is an external (Proxy) schema
-	Set externalDefinition = $ClassMethod(info.ClassName, "%Extends", "%pkg.isc.rest.model.proxy")
+	Set isProxy = $ClassMethod(info.ClassName, "%Extends", "%pkg.isc.rest.model.proxy")
+	Set isSingleton = $ClassMethod(info.ClassName, "%Extends", "%pkg.isc.rest.model.singleton")
+	Set externalDefinition = isProxy || isSingleton
 	Set info.ExternalDefinition = externalDefinition
 	If info.ExternalDefinition {
-		Set info.ExternalClassName = $$$CLASSNAME($Parameter(info.ClassName, "SOURCECLASS"))
+		Set info.ExternalClassName = $Parameter(info.ClassName, $Case(isProxy, 1: "SOURCECLASS", : "SingletonClass"))
 		Set info.RepresentativeClassName = info.ExternalClassName
 		//// Get updated info into the stub
 		Set info.ClassName = info.RepresentativeClassName
@@ -413,7 +415,7 @@ ClassMethod FromStub(stub As %pkg.isc.rest.openAPI.resourceInfoStub, openapi As 
 	Return info
 }
 
-ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resourceInfo, procInfo As %pkg.isc.rest.openAPI.resourceInfo, className, classInfo)
+ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resourceInfo, procInfo As %pkg.isc.rest.openAPI.resourceInfo, className As %String, classInfo As %Dictionary.CompiledClass)
 {
 	If stub.JSONType = "object" {
 		
@@ -421,6 +423,7 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 		If info.JSONMapping '= "" {
 			
 			// Read the XData block
+			#dim mapping As %pkg.isc.json.mapping
 			Set mapping = ##class(%pkg.isc.rest.openAPI.util).ParseJSONMapping(info.RepresentativeClassName, info.JSONMapping, .sc)
 			If $System.Status.IsError(sc) {
 				
@@ -436,6 +439,7 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 				
 				// Iterate over Call elements
 				If mapping.%IsA("%pkg.isc.json.mapping") {
+					Set fieldNameAsCamelCase = mapping.FieldNameAsCamelCase
 					For i=1:1:mapping.callList.Count() {
 						Set call = mapping.callList.GetAt(i)
 						Set callInfo = info.%ConstructClone()
@@ -452,23 +456,30 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 			
 				// Iterate over found properties
 				For i=1:1:mapping.propertyList.Count() {
-					Set property = mapping.propertyList.GetAt(i)
-					#Dim property As %JSON.MappingProperty
+					Set jsonProperty = mapping.propertyList.GetAt(i)
+					#Dim jsonProperty As %pkg.isc.json.mappingProperty
 					
-					Set jsonVarName = property.FieldName
-					Set includeParam = property.Include
-					Set referenceField = property.Reference
-					Set mappingField = property.Mapping
-					Set nullField = property.Null
-					Set ignoreNullField = property.IgnoreNull
-					Set:jsonVarName="" jsonVarName = property.Name
+					Set includeParam = jsonProperty.Include
+					Set referenceField = jsonProperty.Reference
+					Set mappingField = jsonProperty.Mapping
+					Set nullField = jsonProperty.Null
+					Set ignoreNullField = jsonProperty.IgnoreNull
+					// Get the property's JSON name
+					Set jsonVarName = jsonProperty.Name
+					If ($Get(fieldNameAsCamelCase,0)) {
+						Set jsonVarName = ##class(%pkg.isc.json.generator).GetPascalCaseAsCamelCase(jsonVarName)
+					}
+					Set jsonFieldName = jsonProperty.FieldName
+					If (jsonFieldName '= "") {
+						Set jsonVarName = jsonFieldName
+					}
 							
 					// TODO: Comment this
-					Set fieldSource = property.Name
+					Set fieldSource = jsonProperty.Name
 					Set fieldInclude = $ZConvert(includeParam,"L")
 					Set fieldReference = $ZConvert(referenceField,"U")
 					Set:fieldReference="" fieldReference=$c(0)
-					Set sourceProperty = classInfo.Properties.GetAt(classInfo.Properties.FindObject($lb(info.RepresentativeClassName_"||"_property.Name,"%Dictionary.CompiledProperty")))
+					Set sourceProperty = classInfo.Properties.GetAt(classInfo.Properties.FindObject($lb(info.RepresentativeClassName_"||"_jsonProperty.Name,"%Dictionary.CompiledProperty")))
 					Set fieldClassName = $$$CLASSNAME(sourceProperty.Type)
 					Set fieldJSONMapping = mappingField
 					Set:fieldJSONMapping=""&&(info.PropertiesDefaultJSONMapping'="") fieldJSONMapping = info.PropertiesDefaultJSONMapping
@@ -479,7 +490,7 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 					Do fieldInfo.PopulateNonOverwrittenValues()
 					Set:info.PropertiesDefaultIncludeID'="" fieldInfo.IncludeID = info.PropertiesDefaultIncludeID
 					Set:info.PropertiesDefaultIDField'="" fieldInfo.IDField = info.PropertiesDefaultIDField
-					Set:info.PropertiesDefaultReference'=""&&(property.Reference="") fieldInfo.Reference = info.PropertiesDefaultReference
+					Set:info.PropertiesDefaultReference'=""&&(jsonProperty.Reference="") fieldInfo.Reference = info.PropertiesDefaultReference
 					
 					// Get other useful fields from the property (Cardinality, RuntimeType, Required)
 					Set fieldInfo.Cardinality = sourceProperty.Cardinality
@@ -508,14 +519,15 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 		
 		// Handle the case where we are not reading from a JSONMapping XData block
 		If procInfo.JSONMapping = "" {
-			
+			Set fieldNameAsCamelCase = $$$comMemberKeyGet(classInfo.Name,$$$cCLASSparameter,"%JSONFIELDNAMEASCAMELCASE",$$$cPARAMdefault)
 			// Iterate over the class's properties
 			Set properties = classInfo.Properties
 			For i=1:1:properties.Count() {
+				#dim property As %Dictionary.CompiledProperty
 				Set property = properties.GetAt(i)
 				
 				// Don't continue if this is a property we should ignore
-				If property.Name = "%%OID" || (property.Name = "%Concurrency") {
+				If (property.Name = "%%OID") || (property.Name = "%Concurrency") || (property.MultiDimensional) {
 					Continue
 				}
 				
@@ -534,9 +546,13 @@ ClassMethod RetrieveFieldInfo(openapi, stub, info As %pkg.isc.rest.openAPI.resou
 				Set:info.PropertiesDefaultJSONMapping'=""&&(fieldJSONMapping="") fieldJSONMapping = procInfo.PropertiesDefaultJSONMapping
 				
 				// Get the property's JSON name
-				Set fieldName = property.Parameters.GetAt("%JSONFIELDNAME")
-				If fieldName = "" {
-					Set fieldName = fieldSource
+				Set fieldName = fieldSource
+				If (fieldNameAsCamelCase) {
+					Set fieldName = ##class(%pkg.isc.json.generator).GetPascalCaseAsCamelCase(fieldSource)
+				}
+				Set jsonFieldName = property.Parameters.GetAt("%JSONFIELDNAME")
+				If (jsonFieldName '= "") {
+					Set fieldName = jsonFieldName
 				}
 				
 				// Make the PropertyInfo object

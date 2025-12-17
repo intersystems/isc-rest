@@ -1,5 +1,6 @@
 Include %pkg.isc.rest.general
 
+/// zpm "isc.rest test -only -DUnitTest.Case=UnitTest.isc.rest.openAPI"
 Class UnitTest.isc.rest.openAPI Extends UnitTest.isc.rest.testCase
 {
 
@@ -560,25 +561,25 @@ Method TestSpecModificationMethods()
 	Set method3WarningFound = 0
 	For i=1:1:spec.Warnings.Count() {
 		Set warning = $ZConvert(spec.Warnings.GetAt(i),"U")
-		If warning [ "POORLY-TYPED-METHOD-1" && (warning [ "PARAM1") && (warning [ "DYNAMIC") {
+		If (warning [ "POORLY-TYPED-METHOD-1") && (warning [ "PARAM1") && (warning [ "DYNAMIC") {
 			Set method1Arg1WarningFound = method1Arg1WarningFound + 1
-		} ElseIf warning [ "POORLYTYPEDMETHOD1" && (warning [ "ARG1") && (warning [ "DYNAMIC") {
+		} ElseIf (warning [ "POORLYTYPEDMETHOD1") && (warning [ "ARG1") && (warning [ "DYNAMIC") {
 			Set method1Arg1WarningFound = method1Arg1WarningFound + 1
-		} ElseIf warning [ "POORLY-TYPED-METHOD-1" && (warning [ "PARAM2") && (warning [ "DYNAMIC") {
+		} ElseIf (warning [ "POORLY-TYPED-METHOD-1") && (warning [ "PARAM2") && (warning [ "DYNAMIC") {
 			Set method1Arg2WarningFound = method1Arg2WarningFound + 1
-		} ElseIf warning [ "POORLYTYPEDMETHOD1" && (warning [ "ARG2") && (warning [ "DYNAMIC") {
+		} ElseIf (warning [ "POORLYTYPEDMETHOD1") && (warning [ "ARG2") && (warning [ "DYNAMIC") {
 			Set method1Arg2WarningFound = method1Arg2WarningFound + 1
-		} ElseIf warning [ "POORLY-TYPED-METHOD-2" && (warning [ "PARAM1") && (warning [ "NOT") {
+		} ElseIf (warning [ "POORLY-TYPED-METHOD-2") && (warning [ "PARAM1") && (warning [ "NOT") {
 			Set method2Arg1WarningFound = method2Arg1WarningFound + 1
-		} ElseIf warning [ "POORLYTYPEDMETHOD2" && (warning [ "ARG1") && (warning [ "NOT") {
+		} ElseIf (warning [ "POORLYTYPEDMETHOD2") && (warning [ "ARG1") && (warning [ "NOT") {
 			Set method2Arg1WarningFound = method2Arg1WarningFound + 1
-		} ElseIf warning [ "POORLY-TYPED-METHOD-2" && (warning [ "RESPONSE" || (warning [ "RETURN")) && (warning [ "DYNAMIC") {
+		} ElseIf (warning [ "POORLY-TYPED-METHOD-2") && (warning [ "RESPONSE" || (warning [ "RETURN")) && (warning [ "DYNAMIC") {
 			Set method2ReturnWarningFound = method2ReturnWarningFound + 1
-		} ElseIf warning [ "POORLYTYPEDMETHOD2" && (warning [ "RESPONSE" || (warning [ "RETURN")) && (warning [ "DYNAMIC") {
+		} ElseIf (warning [ "POORLYTYPEDMETHOD2") && (warning [ "RESPONSE" || (warning [ "RETURN")) && (warning [ "DYNAMIC") {
 			Set method2ReturnWarningFound = method2ReturnWarningFound + 1
-		} ElseIf warning [ "POORLY-TYPED-METHOD-3" && (warning [ "RESPONSE" || (warning [ "RETURN")) {
+		} ElseIf (warning [ "POORLY-TYPED-METHOD-3") && (warning [ "RESPONSE" || (warning [ "RETURN")) {
 			Set method3WarningFound = method3WarningFound + 1
-		} ElseIf warning [ "POORLYTYPEDMETHOD3" && (warning [ "RESPONSE" || (warning [ "RETURN")) {
+		} ElseIf (warning [ "POORLYTYPEDMETHOD3") && (warning [ "RESPONSE" || (warning [ "RETURN")) {
 			Set method3WarningFound = method3WarningFound + 1
 		} ElseIf (warning [ "VERSION") {
 			Do $$$AssertTrue(0, "Warning """ _ spec.Warnings.GetAt(i) _ """ should NOT be present, but is.")
@@ -593,14 +594,14 @@ Method TestSpecModificationMethods()
 	
 	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-1",spec)), "Removed path item is not present")
 	Try {
-		Do spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/get/requestBody/content/application/json/schema",spec).%JSONExportToString(.str)
+		Do spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/post/requestBody/content/application/json/schema",spec).%JSONExportToString(.str)
 		Do ..VerifyJSON({}.%FromJSON(str), {"type":"number"}, "Modified parameter schema came across correctly")
 	} Catch e {
 		Do $$$AssertTrue(0, $system.Status.GetErrorText(e.AsStatus()))
 	}
-	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/get/responses/204",spec)), "HTTP 204 removed correctly")
+	Do $$$AssertTrue('$IsObject(spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/post/responses/204",spec)), "HTTP 204 removed correctly")
 	Try {
-		Do spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/get/responses/200/content/application/json/schema",spec).%JSONExportToString(.str)
+		Do spec.ResolveReference("#/paths//unittest-resource/$poorly-typed-method-2/post/responses/200/content/application/json/schema",spec).%JSONExportToString(.str)
 		Do ..VerifyJSON({}.%FromJSON(str), {"type":"object","properties":{"key1":{"type":"string"},"key2":{"type":"integer"}}}, "New HTTP 200 return-type schema came across correctly")
 	} Catch e {
 		Do $$$AssertTrue(0, $system.Status.GetErrorText(e.AsStatus()))
@@ -1087,7 +1088,7 @@ Method TestGetAllSchemaRefsFromSpec()
 	set spec = openapi.Specification
 	Do spec.%JSONExportToString(.specJSON)
 	Do $$$LogMessage(specJSON)
-	set requestBody = spec.Paths.GetAt("/unittest-resource/$poorly-typed-method-1").Get.RequestBody
+	set requestBody = spec.Paths.GetAt("/unittest-resource/$poorly-typed-method-1").Post.RequestBody
 	Set schemas = spec.GetAllFromSpec(requestBody, "%pkg.isc.rest.openAPI.model.schemaOrReference")
 	do $$$AssertEquals(schemas.Count(),3)
 	
@@ -1440,7 +1441,7 @@ ClassMethod ModifyOpenAPIInfoSpecModification(ByRef schemas As %ListOfObjects, B
 	Set newArgumentSchema = ##class(%pkg.isc.rest.openAPI.model.schema).%New()
 	Set newArgumentSchema.Type = "number"
 	Set methodEndpoint = endpoints.GetAt("/unittest-resource/$poorly-typed-method-2")
-	Set methodEndpoint.Get.RequestBody.Content.GetAt("application/json").Schema = newArgumentSchema
+	Set methodEndpoint.Post.RequestBody.Content.GetAt("application/json").Schema = newArgumentSchema
 	
 	Set newResponse = ##class(%pkg.isc.rest.openAPI.model.response).%New()
 	Set newResponse.Description = "A successful response"
@@ -1456,8 +1457,8 @@ ClassMethod ModifyOpenAPIInfoSpecModification(ByRef schemas As %ListOfObjects, B
 	Set newReturnMediatype = ##class(%pkg.isc.rest.openAPI.model.mediaType).%New()
 	Set newReturnMediatype.Schema = newReturnSchema
 	Do newResponse.Content.SetAt(newReturnMediatype, "application/json")
-	Do methodEndpoint.Get.Responses.SetAt(newResponse, "200")
-	Do methodEndpoint.Get.Responses.RemoveAt("204")
+	Do methodEndpoint.Post.Responses.SetAt(newResponse, "200")
+	Do methodEndpoint.Post.Responses.RemoveAt("204")
 	
 	// Replace the third problematic action endpoint with a non-problematic one
 	Do endpoints.SetAt(##class(%pkg.isc.rest.openAPI.model.pathItem).%New(), "/unittest-resource/$poorly-typed-method-3")
@@ -1504,12 +1505,12 @@ XData ActionMap2 [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/act
 XData PoorlyTypedMethodsActionMap [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/action" ]
 {
 <actions xmlns="http://www.intersystems.com/_pkg/isc/rest/action">
-<action name="poorly-typed-method-1" target="class" method="GET" call="PoorlyTypedMethod1">
+<action name="poorly-typed-method-1" target="class" method="POST" call="PoorlyTypedMethod1">
 <argument name="param1" target="arg1" source="body-key" />
 <argument name="param2" target="arg2" source="body-key" />
 <argument name="param3" target="arg3" source="query" />
 </action>
-<action name="poorly-typed-method-2" target="class" method="GET" call="PoorlyTypedMethod2">
+<action name="poorly-typed-method-2" target="class" method="POST" call="PoorlyTypedMethod2">
 <argument name="param1" target="arg1" source="body" />
 </action>
 <action name="poorly-typed-method-3" target="class" method="GET" call="PoorlyTypedMethod3">
@@ -1527,3 +1528,4 @@ XData IntegerIdentityActionMap [ XMLNamespace = "http://www.intersystems.com/_pk
 }
 
 }
+

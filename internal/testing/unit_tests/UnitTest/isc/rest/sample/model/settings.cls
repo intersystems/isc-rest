@@ -61,12 +61,22 @@ XData ActionMap [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/acti
 <action name="expanded-user-info" method="GET" target="class" call="GetUserExpandedInfo">
 <argument source="user-context" target="pUserContext" />
 </action>
+<action name="timeout" method="PATCH" call="PatchTimeout">
+<argument name="payload" source="body" target="pRequest"/>
+</action>
 </actions>
 }
 
 ClassMethod GetUserExpandedInfo(pUserContext As UnitTest.isc.rest.sample.userContext) As %DynamicObject
 {
 	Quit {"UsernameUpper":($ZConvert(pUserContext.Username,"U"))}
+}
+
+ClassMethod PatchTimeout(pRequest As %DynamicObject) As %DynamicObject
+{
+    Set response = ##class(%DynamicObject).%New()
+    Set response.timeout = pRequest.timeout
+    Return response
 }
 
 /// Checks if the particular operation is supported for this resource. <br />
@@ -86,7 +96,7 @@ ClassMethod GetUserExpandedInfo(pUserContext As UnitTest.isc.rest.sample.userCon
 ClassMethod Supports(pOperation As %String, pType As %String(VALUELIST=",instance,class"), pRequest As %CSP.Request = {$$$NULLOREF}) As %Boolean
 {
     // Only support GET and POST with no path or query parameters
-    If (pType = "class") && ((pOperation = $$$OperationCreate) || (pOperation = $$$OperationQuery) || (pOperation = $$$OperationAction("expanded-user-info"))) {
+    If (pType = "class") && ((pOperation = $$$OperationCreate) || (pOperation = $$$OperationQuery) || (pOperation = $$$OperationAction("expanded-user-info")) || (pOperation = $$$OperationAction("timeout"))) {
         Return 1
     }
 	Return 0

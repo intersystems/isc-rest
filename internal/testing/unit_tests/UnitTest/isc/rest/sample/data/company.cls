@@ -1,6 +1,6 @@
 /// Use or operation of this code is subject to acceptance of the license available in the code repository for this code.
 /// This sample persistent class represents a company.<br>
-Class UnitTest.isc.rest.sample.data.company Extends (%Persistent, %Populate, %XML.Adaptor, %JSON.Adaptor)
+Class UnitTest.isc.rest.sample.data.company Extends (%Persistent, %Populate, %XML.Adaptor, %pkg.isc.json.adaptor)
 {
 
 /// Define an index for <property>Name</property>.

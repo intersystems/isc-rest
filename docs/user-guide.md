@@ -16,12 +16,13 @@
   - [Accessing Complex/Intertwined Data](#accessing-complexintertwined-data)
     - [%pkg.isc.rest.model.resource](#pkgiscrestmodelresource)
     - [%pkg.isc.rest.model.dbMappedResource](#pkgiscrestmodeldbmappedresource)
-  - [Permissions](#permissions)
+  - [Defining a Custom Resource](#defining-a-custom-resource)
   - [CRUD and Query Endpoints](#crud-and-query-endpoints)
   - [Actions](#actions)
     - [Action Endpoints](#action-endpoints)
   - [Defining Actions](#defining-actions)
   - [Exposing REST Resource in a REST handler](#exposing-rest-resource-in-a-rest-handler)
+- [Permissions](#permissions)
 - [Controlling Endpoints Exposed](#controlling-endpoints-exposed)
 - [Public API Surface](#public-api-surface)
 - [Generated OpenAPI Documentation](#generated-openapi-documentation)
@@ -107,8 +108,7 @@ check for a bearer token and set `pContinue` to false if one is not present;
 `UserInfo` may return an OpenID Connect "userinfo" object; `Logout` may
 invalidate/revoke an access token and `CheckPermission` may check for some basic 
 scopes required to access the REST API.
-In this case, the `AuthenticationStrategy` method in the `%pkg.isc.rest.handler`
-subclass should return the name of the class implementing the authentication strategy.
+In this case, the `AuthenticationStrategy` method in the `%pkg.isc.rest.handler` subclass should return the name of the class implementing the authentication strategy.
 
 ### Define a User Resource
 
@@ -118,8 +118,7 @@ for simple use cases, you may find it helpful to wrap platform security features
 in a registered object; see [UnitTest.isc.rest.sample.userContext](../internal/testing/unit_tests/UnitTest/isc/rest/sample/userContext.cls)
 for an example of this.
 
-In either approach, the `GetUserResource` method in the application's `%pkg.isc.rest.handler` 
-subclass should be overridden to return a new instance of this user model. For example:
+In either approach, the `GetUserResource` method in the application's `%pkg.isc.rest.handler` subclass should be overridden to return a new instance of this user model. For example:
 
 ```
 ClassMethod GetUserResource(pFullUserInfo As %DynamicObject) As UnitTest.isc.rest.sample.userContext
@@ -138,7 +137,6 @@ of your authentication strategy class.
 | GET /auth/status | Returns information about the currently-logged-in user, if the user is authenticated, or an HTTP 401 if the user is not authenticated and authentication is required. This is the return value from `GetUserResource()` of the application's `%pkg.isc.rest.handler` subclass serialized to JSON. |
 | POST /auth/logout | Invokes the authentication strategy's Logout method. (No body expected.) |
 
-
 ### Determine REST resources exposed 
 
 At this point you have a REST handler but no REST resource endpoints.
@@ -152,25 +150,25 @@ describes how to include it in a REST handler.
 ## Defining REST Models
 
 isc.rest provides for standardized access to both persistent data and business logic.
+This is done by defining REST resource classes.
 
 ### Accessing Data: Adaptor vs. Proxy
 
-There are two different approaches to exposing persistent data over REST.
-The "Adaptor" approach provides a single REST representation for the existing `%Persistent` class.
+There are two different approaches to exposing persistent data over REST. 
+The "Adaptor" approach provides a single REST representation for the existing `%Persistent` class. 
 The "Proxy" approach provides a REST representation for a *different* `Persistent` class.
 
 #### %pkg.isc.rest.model.adaptor
 
-To expose data of a class that extends %Persistent over REST, simply extend `%pkg.isc.rest.model.adaptor` as well. 
-Then, override the following class parameters:
+To expose data of a class that extends %Persistent over REST, simply extend `%pkg.isc.rest.model.adaptor` as well. Then, override the following class parameters:
 
 * `RESOURCENAME`: Set this to the URL prefix you want to use for the resource in a REST context (e.g., "person").
-* `JSONMAPPING` (optional): Set this to the name of a JSON mapping XData block.
-Defaults to empty (the class's default JSON mapping).
-Look at [Using XData Mapping Blocks](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GJSON_adaptor#GJSON_adaptor_xdata) to understand how JSON mapping XData blocks work.
-* `MEDIATYPE` (optional): May be overridden to specify a different media type 
-(e.g., application/vnd.yourcompany.v1+json; must still be an application/json 
-subtype or else you will see a compilation error). Defaults to "application/json".
+* `JSONMAPPING` (optional): Set this to the name of a JSON mapping XData block. Defaults to empty (the class's default JSON mapping). Look at [Using XData Mapping Blocks](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GJSON_adaptor#GJSON_adaptor_xdata)
+to understand how JSON mapping XData blocks work.
+* `MEDIATYPE` (optional): May be overridden to
+specify a different media type (e.g., application/vnd.yourcompany.v1+json;
+must still be an application/json subtype or else you will see a compilation error).
+Defaults to "application/json".
 * `IndexToUse` (optional): An alternate unique index to use to identify records
 of this class over the [CRUD endpoints](#crud-and-query-endpoints) listed below.
 Defaults to "ID" to use the default unique index on row ID of the class.
@@ -180,15 +178,10 @@ For an example of using `%pkg.isc.rest.model.adaptor`, see:
 
 #### %pkg.isc.rest.model.proxy
 
-To expose data of a *different* class that extends %Persistent over REST, perhaps 
-using an alternative JSON mapping from other projections of the same data, 
-extend `%pkg.isc.rest.model.proxy`.
-In addition to the same parameters as `%pkg.isc.rest.model.adaptor`, you must also 
-override the `SOURCECLASS` parameter to specify a different class that extends 
-both `%pkg.isc.json.adaptor` and `%Persistent`.
+To expose data of a *different* class that extends %Persistent over REST, perhaps using an alternative JSON mapping from other projections of the same data, extend `%pkg.isc.rest.model.proxy`. In addition to the same parameters as `%pkg.isc.rest.model.adaptor`, you must also override the `SOURCECLASS` parameter to specify a different class that extends both `%pkg.isc.json.adaptor` and `%Persistent`.
 
 For an example of using `%pkg.isc.rest.model.proxy`, see:
-[UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls)
+[UnitTest.isc.rest.sample.model.person](https://github.com/intersystems/isc-rest/blob/master/internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls)
 
 ### Accessing Complex/Intertwined Data
 
@@ -203,32 +196,30 @@ For an example of using `%pkg.isc.rest.model.resource`, see:
 [UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/settings.cls)
 
 #### %pkg.isc.rest.model.dbMappedResource
-
 To expose data that maps to a single %Persistent class, involving significant augmentation or cutting of the JSON that would normally be returned in the response if the %Persistent class were extending `%pkg.isc.rest.model.adaptor`, extend `%pkg.isc.rest.model.dbMappedResource` and overwrite the GeModelFromObject method to populate properties.  
 
-### Permissions
+### Defining a Custom Resource
 
-Using any of the above approaches for accessing/exposing data, all endpoints for 
-accessing the data are protected via the `CheckPermission()` method.
-Irrespective of which `%pkg.isc.rest.model.*` class above you extend, you must 
-override the `CheckPermission()` method, which by default says that nothing is allowed:
+The data for a REST resource may not always be in a single location or be easily
+mapped to a common persistent entity. In that case, individual REST operations 
+can be implemented in a custom manner in a subclass of `%pkg.isc.rest.model.resource`.
+Note that this is the base class of all the above resource classes.
 
-```
-/// Checks the user's permission for a particular operation on a particular record.
-/// <var>pOperation</var> may be one of the macros of the form $$$Operation*
-/// present in %pkg.isc.rest.general.inc. <br />
-/// If this method returns 0, the corresponding dispatch class will return a 403
-/// Unauthorized status when the operation is invoked. <br />
-/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>. <br />
-ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext As %RegisteredObject) As %Boolean
-{
-    Quit 0
-}
-```
+This class provides an interface of methods that are used by various different 
+REST endpoints in the UrlMap as discussed below:
+- `GetCollection`: Is called by `GET /:resource` endpoint to query a resource i.e.
+obtain multiple records of the resource.
+- `GetModelInstance`: Is called by multiple endpoints to retrieve a single record 
+of the resource. When provided with arguments, it obtains the unique resource record 
+matching the arguments. When no arguments provided, it returns an empty resource 
+record.
+- `SaveModelInstance`: Is called by `POST /:resource` and `PUT /:resource/:id`
+to create or update a resource record.
+- `DeleteModelInstance`: Is called by `DELETE /:resource/:id` to delete a resource record.
 
-`pUserContext` is an instance of the [user resource defined earlier](#define-a-user-resource).
-
-Implement this method with any security checks you want for your REST resource.
+You need not implement all of the above. Can implement just the ones applicable 
+for your use case or even choose to implement none of them if your REST resource 
+contains only business logic (see [Actions](#actions) below)
 
 ### CRUD and Query Endpoints
 
@@ -252,6 +243,7 @@ which require an ID.
 "Actions" allow you to provide a REST projection of business logic (that is,
 ObjectScript methods and classmethods) and class queries (abstractions of more
 complex SQL) alongside the basic REST capabilities.
+
 To start, override the `Actions` XData block:
 
 ```
@@ -260,18 +252,20 @@ XData ActionMap [ XMLNamespace = "http://www.intersystems.com/_pkg/isc/rest/acti
 }
 ```
 
-NOTE: Studio/VS Code will help with code completion for XML in this namespace.
+NOTE: Studio/VS code will help with code completion for XML in this namespace.
 
-[UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls) has annotated examples covering the full range of action capabilities.
-As a general guideline, do ensure that the HTTP verb matches the behavior of the
-endpoint (e.g., PUT and DELETE are idempotent, GET is safe, POST is neither).
+The XData block can be part of any REST resource class among those mentioned above.
+If your REST resource has ONLY business logic i.e. no persistence, then extend 
+`%pkg.isc.rest.model.resource`.
+
+[UnitTest.isc.rest.sample.model.person](../internal/testing/unit_tests/UnitTest/isc/rest/sample/model/person.cls) has annotated examples covering the full range of action capabilities. As a general guideline, do ensure that the HTTP verb matches the behavior of the endpoint (e.g., PUT and DELETE are idempotent, GET is safe, POST is neither).
 
 #### Action Endpoints
 
 | HTTP Verbs + Endpoint | Function |
 | --------------------- | -------- |
-| GET,PUT,POST,PATCH,DELETE `/:resource/$:action` | Performs the named action on the specified resource. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
-| GET,PUT,POST,PATCH,DELETE `/:resource/:id/$:action` | Performs the named action on the specified resource instance. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
+| GET,PUT,POST,DELETE `/:resource/$:action` | Performs the named action on the specified resource. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
+| GET,PUT,POST,DELETE `/:resource/:id/$:action` | Performs the named action on the specified resource instance. Constraints and format of URL parameters, body, and response contents will vary from action to action, but are well-defined via the ActionMap XData block. |
 
 ### Defining Actions
 
@@ -331,6 +325,28 @@ classes to their corresponding REST handler classes so no runtime logic should b
 present here.
 
 An example is present in [UnitTest.isc.rest.sample.handler](../internal/testing/unit_tests/UnitTest/isc/rest/sample/handler.cls).
+
+
+## Permissions
+
+Irrespective of the type of resource class, you must override the `CheckPermission()`
+method, which by default says that nothing is allowed i.e. all requests will get a 
+403 Unauthorized error response when attempting to access the resource:
+
+```
+/// Checks the user's permission for a particular operation on a particular record.
+/// <var>pOperation</var> may be one of the macros of the form $$$Operation*
+/// present in %pkg.isc.rest.general.inc. <br />
+/// If this method returns 0, the corresponding dispatch class will return a 403
+/// Unauthorized status when the operation is invoked. <br />
+/// <var>pUserContext</var> is supplied by <method>GetUserContext</method>. <br />
+ClassMethod CheckPermission(pID As %String, pOperation As %String, pUserContext As %RegisteredObject) As %Boolean
+{
+    Quit 0
+}
+```
+
+`pUserContext` is an instance of the [user resource defined earlier](#define-a-user-resource).
 
 ## Controlling Endpoints Exposed
 
@@ -415,6 +431,7 @@ on the classes:
 - `%pkg.isc.rest.model.adaptor`
 - `%pkg.isc.rest.model.dbMappedResource`
 - `%pkg.isc.rest.openAPI.model.*`
+- `%pkg.isc.rest.utils`
 
 Only the following include files should be directly used by consuming applications:
 - `%pkg.isc.rest.general`

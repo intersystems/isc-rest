@@ -41,17 +41,17 @@ ClassMethod GenerateActions(pCode, pActionClassName, pType) [ Private ]
 			// the same path parameters (but differently named) are flagged
 			// as duplicate. e.g. /hello/:one and /hello/:two are fundamentally
 			// the same action and so should be disallowed.
-			Set seenActionMapKey = $ListBuild(action.resolvedName,action.method)
+			Set seenActionMapKey = $ListBuild(action.resolvedName,action.method,action.contentType)
 			If $Data(seenActionMap(seenActionMapKey)) {
 				// This action name + method has been seen so there is a duplicate
 				// which is not permitted
-				Set msg = $$$FormatText("Duplicate action found. Name: '%1'. Method: '%2'",action.name,action.method)
+				Set msg = $$$FormatText("Duplicate action found. Name: '%1'. Method: '%2'. ContentType: '%3'",action.name,action.method,action.contentType)
 				$$$ThrowStatus($$$ERROR($$$GeneralError,msg))
 			}
 			Do action.Generate(sourceClass, .actionCode, .accepts, .contentType)
 			
 			// Register newly-created actions.
-			&sql(insert or update into %pkg_isc_rest.actionMap
+			&sql(insert or update %NOLOCK into %pkg_isc_rest.actionMap
 				(DispatchClass, ResourceName, ActionName, ActionTarget, HTTPVerb, MediaType, Accepts, ResourceClass, ImplementationClass) values
 				(NULL, :resourceName, :action.name, :action.target, :action.method, :contentType, :accepts, :sourceClass, :pActionClassName))
 			If (SQLCODE < 0) {
